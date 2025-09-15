@@ -23,18 +23,19 @@ http.route({
         twilioData: Object.fromEntries(params.entries()),
       };
 
-      // Store the incoming message
-      await ctx.runMutation(api.whatsapp.storeIncomingMessage, messageData);
-
-      // Process message with AI agent (async, don't wait for response)
+      // Process message with enhanced Twilio integration
       if (messageData.body && messageData.body.trim()) {
-        console.log("📅 Scheduling AI processing for message:", messageData.messageId);
-        // Schedule the AI processing to run immediately after storing the message
-        await ctx.scheduler.runAfter(0, internal.aiAgent.processIncomingMessage, {
+        console.log("📅 Processing inbound WhatsApp message:", messageData.messageId);
+        
+        // Use the new enhanced Twilio processing
+        await ctx.scheduler.runAfter(0, internal.functions.twilio.processInboundMessage, {
           messageId: messageData.messageId,
           from: messageData.from,
           to: messageData.to,
           body: messageData.body,
+          mediaUrl: messageData.mediaUrl,
+          mediaContentType: messageData.mediaContentType,
+          twilioData: messageData.twilioData,
         });
       }
 
@@ -100,7 +101,7 @@ http.route({
         );
       }
 
-      const result = await ctx.runAction(api.whatsapp.sendMessage, {
+      const result = await ctx.runAction(api.functions.twilio.sendMessage, {
         to,
         body,
         mediaUrl,

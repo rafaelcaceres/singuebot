@@ -15,6 +15,11 @@ import type {
 } from "convex/server";
 import type * as aiAgent from "../aiAgent.js";
 import type * as auth from "../auth.js";
+import type * as functions_interview from "../functions/interview.js";
+import type * as functions_rag from "../functions/rag.js";
+import type * as functions_rag_actions from "../functions/rag_actions.js";
+import type * as functions_twilio from "../functions/twilio.js";
+import type * as functions_twilio_db from "../functions/twilio_db.js";
 import type * as http from "../http.js";
 import type * as router from "../router.js";
 import type * as whatsapp from "../whatsapp.js";
@@ -30,6 +35,11 @@ import type * as whatsapp from "../whatsapp.js";
 declare const fullApi: ApiFromModules<{
   aiAgent: typeof aiAgent;
   auth: typeof auth;
+  "functions/interview": typeof functions_interview;
+  "functions/rag": typeof functions_rag;
+  "functions/rag_actions": typeof functions_rag_actions;
+  "functions/twilio": typeof functions_twilio;
+  "functions/twilio_db": typeof functions_twilio_db;
   http: typeof http;
   router: typeof router;
   whatsapp: typeof whatsapp;
