@@ -3,20 +3,17 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Authenticated, Unauthenticated } from "convex/react";
 import App from "./App";
 import { AdminLayout } from "./admin/layout/AdminLayout";
-import { Dashboard } from "./admin/pages/Dashboard";
+import Dashboard from "./admin/pages/Dashboard";
 import { SignInForm } from "./SignInForm";
+import { Conversations } from "./admin/pages/Conversations";
+import { KnowledgePage } from "./admin/pages/KnowledgePage";
+import { Participants } from "./admin/pages/Participants";
+import { UserManagement } from "./admin/pages/UserManagement";
 
 // Placeholder components for admin pages - will be implemented later
-function ParticipantsPage() {
-  return <div className="p-8">Participantes - Em desenvolvimento</div>;
-}
 
 function ConversationsPage() {
   return <div className="p-8">Conversas - Em desenvolvimento</div>;
-}
-
-function KnowledgePage() {
-  return <div className="p-8">Conhecimento - Em desenvolvimento</div>;
 }
 
 function ContentPage() {
@@ -70,10 +67,11 @@ export function AppRouter() {
           </Authenticated>
         }>
           <Route index element={<Dashboard />} />
-          <Route path="participants" element={<ParticipantsPage />} />
-          <Route path="conversations" element={<ConversationsPage />} />
+          <Route path="participants" element={<Participants />} />
+          <Route path="conversations" element={<Conversations />} />
           <Route path="conversations/:id" element={<ConversationsPage />} />
           <Route path="knowledge" element={<KnowledgePage />} />
+          <Route path="users" element={<UserManagement />} />
           <Route path="content" element={<ContentPage />} />
           <Route path="templates" element={<TemplatesPage />} />
           <Route path="import" element={<ImportPage />} />

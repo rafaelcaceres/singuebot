@@ -10,7 +10,8 @@ import {
   MessageCircle,
   Upload,
   Settings,
-  Calendar
+  Calendar,
+  UserCog
 } from "lucide-react";
 
 const menuItems = [
@@ -37,6 +38,12 @@ const menuItems = [
     href: "/admin/knowledge", 
     icon: BookOpen,
     roles: ["owner", "editor"]
+  },
+  {
+    title: "Usuários",
+    href: "/admin/users",
+    icon: UserCog,
+    roles: ["owner"]
   },
   {
     title: "Conteúdo",

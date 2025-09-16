@@ -34,8 +34,23 @@ export const processIncomingMessage = internalAction({
 
       console.log("🤖 AI Agent: Conversation history:", conversationHistory);
 
-      // Generate AI response
-      const aiResponse = await generateAIResponse(args.body, conversationHistory);
+      // Retrieve relevant knowledge context using RAG
+      let knowledgeContext: any[] = [];
+      try {
+        knowledgeContext = await ctx.runAction(
+          internal.functions.rag_actions.retrieve,
+          {
+            query: args.body,
+            topK: 3, // Get top 3 most relevant chunks
+          }
+        );
+        console.log("🤖 AI Agent: Retrieved knowledge context:", knowledgeContext.length, "chunks");
+      } catch (error) {
+        console.log("🤖 AI Agent: No knowledge context available:", error);
+      }
+
+      // Generate AI response with knowledge context
+      const aiResponse = await generateAIResponse(args.body, conversationHistory, knowledgeContext);
       console.log("🤖 AI Agent: Generated AI response:", aiResponse);
 
       if (aiResponse) {
@@ -128,7 +143,8 @@ export const logAIInteraction = internalMutation({
 // Helper function to generate AI response
 async function generateAIResponse(
   userMessage: string,
-  conversationHistory: Array<{ role: string; content: string; timestamp: number }>
+  conversationHistory: Array<{ role: string; content: string; timestamp: number }>,
+  knowledgeContext?: any[]
 ): Promise<string | null> {
   try {
     // Initialize OpenAI with Convex credentials or user's own
@@ -137,11 +153,20 @@ async function generateAIResponse(
       apiKey: process.env.CONVEX_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
     });
 
+    // Build context from knowledge base if available
+    let contextPrompt = "";
+    if (knowledgeContext && knowledgeContext.length > 0) {
+      const contextText = knowledgeContext
+        .map(chunk => chunk.chunk)
+        .join("\n\n");
+      contextPrompt = `\n\nRelevant knowledge context:\n${contextText}\n\nUse this context to provide accurate and helpful responses when relevant.`;
+    }
+
     // Build conversation context
     const messages = [
       {
         role: "system" as const,
-        content: `${AI_AGENT_CONFIG.personality}
+        content: `${AI_AGENT_CONFIG.personality}${contextPrompt}
         
 Current time: ${new Date().toLocaleString()}
 Keep responses under 160 characters when possible for WhatsApp.`,
