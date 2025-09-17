@@ -10,16 +10,6 @@ import { KnowledgePage } from "./admin/pages/KnowledgePage";
 import { Participants } from "./admin/pages/Participants";
 import { UserManagement } from "./admin/pages/UserManagement";
 
-// Placeholder components for admin pages - will be implemented later
-
-function ConversationsPage() {
-  return <div className="p-8">Conversas - Em desenvolvimento</div>;
-}
-
-function ContentPage() {
-  return <div className="p-8">Conteúdo - Em desenvolvimento</div>;
-}
-
 function TemplatesPage() {
   return <div className="p-8">Templates HSM - Em desenvolvimento</div>;
 }
@@ -57,30 +47,31 @@ export function AppRouter() {
           </Unauthenticated>
         } />
 
-        {/* Main WhatsApp interface (existing) */}
-        <Route path="/" element={<App />} />
-
-        {/* Admin routes */}
-        <Route path="/admin" element={
+        {/* Main authenticated routes */}
+        <Route path="/" element={
           <Authenticated>
             <AdminLayout />
           </Authenticated>
         }>
+          {/* Dashboard as home page */}
           <Route index element={<Dashboard />} />
+          
+          {/* WhatsApp interface moved to /whatsapp */}
+          <Route path="whatsapp" element={<App />} />
+          
+          {/* Admin pages */}
           <Route path="participants" element={<Participants />} />
           <Route path="conversations" element={<Conversations />} />
-          <Route path="conversations/:id" element={<ConversationsPage />} />
           <Route path="knowledge" element={<KnowledgePage />} />
           <Route path="users" element={<UserManagement />} />
-          <Route path="content" element={<ContentPage />} />
           <Route path="templates" element={<TemplatesPage />} />
           <Route path="import" element={<ImportPage />} />
           <Route path="jobs" element={<JobsPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>
 
-        {/* Redirect unauthenticated admin access to login */}
-        <Route path="/admin/*" element={
+        {/* Redirect unauthenticated access to login */}
+        <Route path="/*" element={
           <Unauthenticated>
             <Navigate to="/login" replace />
           </Unauthenticated>

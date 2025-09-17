@@ -11,67 +11,74 @@ import {
   Upload,
   Settings,
   Calendar,
-  UserCog
+  UserCog,
+  Phone
 } from "lucide-react";
 
 const menuItems = [
   {
     title: "Dashboard",
-    href: "/admin",
+    href: "/",
     icon: LayoutDashboard,
     roles: ["owner", "editor", "viewer"]
   },
   {
+    title: "WhatsApp",
+    href: "/whatsapp",
+    icon: Phone,
+    roles: ["owner", "editor", "viewer"]
+  },
+  {
     title: "Participantes", 
-    href: "/admin/participants",
+    href: "/participants",
     icon: Users,
     roles: ["owner", "editor", "viewer"]
   },
   {
     title: "Conversas",
-    href: "/admin/conversations",
+    href: "/conversations",
     icon: MessageSquare,
     roles: ["owner", "editor", "viewer"]
   },
   {
     title: "Conhecimento",
-    href: "/admin/knowledge", 
+    href: "/knowledge", 
     icon: BookOpen,
     roles: ["owner", "editor"]
   },
   {
     title: "Usuários",
-    href: "/admin/users",
+    href: "/users",
     icon: UserCog,
     roles: ["owner"]
   },
   {
     title: "Conteúdo",
-    href: "/admin/content",
+    href: "/content",
     icon: FileText,
     roles: ["owner", "editor"]
   },
   {
     title: "Templates HSM",
-    href: "/admin/templates",
+    href: "/templates",
     icon: MessageCircle,
     roles: ["owner", "editor"]
   },
   {
     title: "Importar CSV",
-    href: "/admin/import",
+    href: "/import",
     icon: Upload,
     roles: ["owner", "editor"]
   },
   {
     title: "Jobs & Logs",
-    href: "/admin/jobs",
+    href: "/jobs",
     icon: Calendar,
     roles: ["owner", "editor", "viewer"]
   },
   {
     title: "Configurações",
-    href: "/admin/settings",
+    href: "/settings",
     icon: Settings,
     roles: ["owner"]
   }
