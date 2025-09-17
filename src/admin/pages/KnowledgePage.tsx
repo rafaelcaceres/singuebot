@@ -26,7 +26,6 @@ interface Document {
   source: string;
   status: "ingested" | "pending" | "failed";
   tags: string[];
-  uploadedAt: number;
   createdAt: number;
 }
 
@@ -35,17 +34,17 @@ export const KnowledgePage: React.FC = () => {
   const [selectedTab, setSelectedTab] = useState("documents");
   
   // Queries
-  const documents = useQuery(api.admin.getKnowledgeDocuments) || [];
+  const documents = useQuery(api.functions.admin.knowledge.getDocuments) || [];
+  const stats = useQuery(api.functions.admin.knowledge.getDocumentStats);
   const processingJobs = useQuery(api.admin.getProcessingJobs) || [];
   
   // Mutations
-  const deleteDocument = useMutation(api.admin.deleteKnowledgeDocument);
-  const reindexDocument = useMutation(api.admin.reindexDocument);
-  const reindexAll = useMutation(api.admin.reindexAllDocuments);
+  const deleteDocument = useMutation(api.functions.admin.knowledge.deleteDocument);
+  const reindexDocument = useMutation(api.functions.admin.knowledge.reindexDocument);
 
   const handleDeleteDocument = async (documentId: string) => {
     try {
-      await deleteDocument({ documentId: documentId as Id<"knowledge_docs"> });
+      await deleteDocument({ docId: documentId as Id<"knowledge_docs"> });
       toast({
         title: "Documento excluído",
         description: "O documento foi removido com sucesso.",
@@ -61,7 +60,7 @@ export const KnowledgePage: React.FC = () => {
 
   const handleReindexDocument = async (documentId: string) => {
     try {
-      await reindexDocument({ documentId: documentId as Id<"knowledge_docs"> });
+      await reindexDocument({ docId: documentId as Id<"knowledge_docs"> });
       toast({
         title: "Reindexação iniciada",
         description: "O documento será reprocessado em breve.",
@@ -77,7 +76,12 @@ export const KnowledgePage: React.FC = () => {
 
   const handleReindexAll = async () => {
     try {
-      await reindexAll();
+      // For now, we'll reindex all documents individually
+      // since there's no reindexAll function in the backend
+      const allDocs = documents || [];
+      for (const doc of allDocs) {
+        await reindexDocument({ docId: doc._id });
+      }
       toast({
         title: "Reindexação geral iniciada",
         description: "Todos os documentos serão reprocessados.",
@@ -246,7 +250,7 @@ export const KnowledgePage: React.FC = () => {
                           <div className="flex items-center space-x-2 text-sm text-muted-foreground">
                             <span>{doc.source}</span>
                             <span>•</span>
-                            <span>Enviado em {formatDate(doc.uploadedAt)}</span>
+                            <span>Enviado em {formatDate(doc.createdAt)}</span>
                           </div>
                           {doc.status === "failed" && (
                             <p className="text-sm text-red-500 mt-1">Falha no processamento</p>
@@ -305,7 +309,7 @@ export const KnowledgePage: React.FC = () => {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {processingJobs.map((job) => (
+                  {processingJobs.map((job: any) => (
                     <div key={job._id} className="p-4 border rounded-lg">
                       <div className="flex items-center justify-between mb-2">
                         <h4 className="font-medium">{job.title}</h4>
