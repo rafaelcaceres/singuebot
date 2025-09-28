@@ -37,7 +37,7 @@ singue/
 ├── convex/                 # Backend Convex
 │   ├── schema.ts          # Definições do banco
 │   ├── whatsapp.ts        # Integração WhatsApp
-│   ├── aiAgent.ts         # Processamento IA
+│   ├── agents.ts         # Processamento IA com Convex Agent
 │   ├── admin.ts           # Funções admin
 │   ├── knowledge.ts       # Sistema RAG
 │   ├── http.ts            # Rotas HTTP

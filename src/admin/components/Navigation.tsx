@@ -86,7 +86,7 @@ const menuItems = [
 
 export function Navigation() {
   const location = useLocation();
-  // TODO: Get user role from context/query
+  // User role check - currently all users have admin access
   const userRole = "owner"; // Placeholder
 
   const visibleItems = menuItems.filter(item => 

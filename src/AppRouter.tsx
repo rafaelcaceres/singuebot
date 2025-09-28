@@ -9,10 +9,7 @@ import { Conversations } from "./admin/pages/Conversations";
 import { KnowledgePage } from "./admin/pages/KnowledgePage";
 import { Participants } from "./admin/pages/Participants";
 import { UserManagement } from "./admin/pages/UserManagement";
-
-function TemplatesPage() {
-  return <div className="p-8">Templates HSM - Em desenvolvimento</div>;
-}
+import { TemplatesPage } from "./admin/pages/TemplatesPage";
 
 function ImportPage() {
   return <div className="p-8">Importar CSV - Em desenvolvimento</div>;
@@ -26,7 +23,7 @@ function SettingsPage() {
   return <div className="p-8">Configurações - Em desenvolvimento</div>;
 }
 
-export function AppRouter() {
+export function AppRouter() {  
   return (
     <BrowserRouter>
       <Routes>

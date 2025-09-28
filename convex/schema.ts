@@ -3,22 +3,67 @@ import { v } from "convex/values";
 import { authTables } from "@convex-dev/auth/server";
 
 const applicationTables = {
-  // Enhanced WhatsApp message table with state snapshot support
+  // Enhanced WhatsApp message table with normalized structure
   whatsappMessages: defineTable({
     messageId: v.string(), // Twilio message SID
-    from: v.string(), // Phone number with whatsapp: prefix
-    to: v.string(), // Phone number with whatsapp: prefix
     body: v.string(), // Message content
-    status: v.string(), // Message status (sent, delivered, read, failed, etc.)
+    status: v.union(
+      v.literal("received"),
+      v.literal("processing"),
+      v.literal("sent"),
+      v.literal("delivered"),
+      v.literal("read"),
+      v.literal("failed")
+    ), // Structured message status enum
     direction: v.union(v.literal("inbound"), v.literal("outbound")), // Message direction
+    
+    // AI normalization - store AI responses as outbound messages
+    messageType: v.union(v.literal("inbound"), v.literal("outbound"), v.literal("ai_response")),
+    aiMetadata: v.optional(v.object({
+      model: v.string(),
+      tokens: v.number(),
+      processingTimeMs: v.number(), // Renamed for consistency with aiInteractions
+      fallbackUsed: v.boolean(), // Quality metrics
+      timestamp: v.number(), // AI interaction timestamp
+      threadId: v.string(), // Convex Agent thread reference
+      interviewState: v.optional(v.any()), // Interview state snapshot for debugging
+    })),
+    
     mediaUrl: v.optional(v.string()), // URL for media attachments
     mediaContentType: v.optional(v.string()), // Content type of media
     twilioData: v.optional(v.any()), // Raw Twilio webhook data
-    stateSnapshot: v.optional(v.any()), // Interview state at message time (NEVER exposed to users)
+    
+    // Structured state snapshot for processing tracking
+    stateSnapshot: v.optional(v.object({
+      twilioPayload: v.object({
+        MessageSid: v.string(),
+        AccountSid: v.string(),
+        From: v.string(),
+        To: v.string(),
+        Body: v.optional(v.string()),
+        MediaUrl0: v.optional(v.string()),
+        MediaContentType0: v.optional(v.string())
+      }),
+      processingState: v.object({
+        received: v.number(),
+        processed: v.optional(v.number()),
+        responded: v.optional(v.number())
+      })
+    })),
+    
+    // Stable conversation identifiers for linking messages to conversations
+    participantId: v.id("participants"), // Link to participant record (required)
+    conversationId: v.id("conversations"), // Link to conversation record (required)
+    threadId: v.optional(v.string()), // Convex Agent thread reference for AI context
   })
-    .index("by_from", ["from"])
-    .index("by_to", ["to"])
+    // Primary lookup indexes
     .index("by_message_id", ["messageId"])
+    .index("by_participant", ["participantId"])
+    .index("by_conversation", ["conversationId"])
+    .index("by_thread", ["threadId"])
+    
+    // Status and direction indexes for filtering
+    .index("by_status", ["status"])
     .index("by_direction", ["direction"]),
 
   whatsappContacts: defineTable({
@@ -30,16 +75,7 @@ const applicationTables = {
     .index("by_phone", ["phoneNumber"])
     .index("by_active", ["isActive"]),
 
-  aiInteractions: defineTable({
-    originalMessageId: v.string(), // Reference to the original WhatsApp message
-    userMessage: v.string(), // The user's message that triggered AI
-    aiResponse: v.string(), // The AI's response
-    phoneNumber: v.string(), // Phone number of the user
-    timestamp: v.number(), // When the interaction occurred
-  })
-    .index("by_phone", ["phoneNumber"])
-    .index("by_message_id", ["originalMessageId"])
-    .index("by_timestamp", ["timestamp"]),
+
 
   // Interview & Admin tables
   participants: defineTable({
@@ -49,11 +85,22 @@ const applicationTables = {
     clusterId: v.optional(v.id("clusters")), // Cluster assignment
     tags: v.array(v.string()), // Custom tags
     createdAt: v.number(), // Registration timestamp
+    threadId: v.optional(v.string()), // Active conversation thread ID for context persistence
+    
+    // Professional information fields
+    cargo: v.optional(v.string()), // Job position/role
+    empresa: v.optional(v.string()), // Company name
+    setor: v.optional(v.string()), // Industry sector
   })
     .index("by_phone", ["phone"])
     .index("by_cluster", ["clusterId"])
     .index("by_consent", ["consent"])
-    .index("by_created", ["createdAt"]),
+    .index("by_created", ["createdAt"])
+    .index("by_thread", ["threadId"])
+    .index("by_cargo", ["cargo"])
+    .index("by_empresa", ["empresa"])
+    .index("by_setor", ["setor"])
+    .index("by_empresa_setor", ["empresa", "setor"]),
 
   organizers: defineTable({
     email: v.string(), // Organizer email
@@ -89,6 +136,24 @@ const applicationTables = {
     twilioId: v.string(), // Twilio HSM template SID
     variables: v.array(v.string()), // Template variable names
     stage: v.string(), // Interview stage where used
+    // Variable mapping configuration
+    variableMappings: v.optional(v.array(v.object({
+      templateVariable: v.string(), // Variable name in template (e.g., "nome", "telefone")
+      participantField: v.string(), // Field in participant table (e.g., "name", "phone")
+      defaultValue: v.optional(v.string()), // Default value if field is empty
+      isRequired: v.boolean(), // Whether this mapping is required
+    }))),
+    // Template structure from Twilio
+    twilioStructure: v.optional(v.object({
+      friendlyName: v.string(),
+      language: v.string(),
+      variables: v.array(v.object({
+        key: v.string(),
+        type: v.string(),
+      })),
+      body: v.optional(v.string()), // Template body text
+      lastFetched: v.number(), // When structure was last fetched
+    })),
   })
     .index("by_name", ["name"])
     .index("by_locale", ["locale"])

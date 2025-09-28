@@ -1,5 +1,8 @@
 import { DocumentFormat } from "@/types/rag";
 
+// File size limit: 2MB
+const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB in bytes
+
 /**
  * Validates file format for document upload
  */
@@ -13,6 +16,66 @@ export function validateDocumentFormat(file: File): boolean {
   );
   
   return hasValidType || hasValidExtension;
+}
+
+/**
+ * Validates file size (max 2MB)
+ */
+export function validateFileSize(file: File): boolean {
+  return file.size <= MAX_FILE_SIZE;
+}
+
+/**
+ * Validates multiple files total size (max 2MB combined)
+ */
+export function validateTotalFileSize(files: File[]): boolean {
+  const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+  return totalSize <= MAX_FILE_SIZE;
+}
+
+/**
+ * Comprehensive file validation
+ */
+export function validateFile(file: File): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+  
+  if (!validateDocumentFormat(file)) {
+    errors.push('Formato de arquivo não suportado. Use PDF, MD ou TXT.');
+  }
+  
+  if (!validateFileSize(file)) {
+    errors.push(`Arquivo muito grande. Máximo permitido: ${formatFileSize(MAX_FILE_SIZE)}.`);
+  }
+  
+  return {
+    valid: errors.length === 0,
+    errors
+  };
+}
+
+/**
+ * Validates multiple files
+ */
+export function validateFiles(files: File[]): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+  
+  // Check individual files
+  for (const file of files) {
+    const fileValidation = validateFile(file);
+    if (!fileValidation.valid) {
+      errors.push(`${file.name}: ${fileValidation.errors.join(', ')}`);
+    }
+  }
+  
+  // Check total size
+  if (!validateTotalFileSize(files)) {
+    errors.push(`Tamanho total dos arquivos excede ${formatFileSize(MAX_FILE_SIZE)}.`);
+  }
+  
+  return {
+    valid: errors.length === 0,
+    errors
+  };
 }
 
 /**
@@ -46,6 +109,47 @@ export async function readFileAsText(file: File): Promise<string> {
     
     reader.readAsText(file);
   });
+}
+
+/**
+ * Process PDF file (placeholder - would need PDF.js or similar)
+ */
+export async function processPDFFile(file: File): Promise<string> {
+  // For now, return a placeholder
+  // In a real implementation, you'd use PDF.js or similar library
+  throw new Error('PDF processing not yet implemented. Please use TXT or MD files for now.');
+}
+
+/**
+ * Process document file based on format
+ */
+export async function processDocumentFile(file: File): Promise<string> {
+  const format = getDocumentFormat(file);
+  
+  switch (format) {
+    case 'txt':
+    case 'md':
+      return await readFileAsText(file);
+    case 'pdf':
+      return await processPDFFile(file);
+    default:
+      throw new Error('Unsupported file format');
+  }
+}
+
+/**
+ * Generate content hash for deduplication
+ */
+export function generateContentHash(content: string, filename: string): string {
+  // Simple hash function - in production, use crypto.subtle.digest
+  let hash = 0;
+  const str = content + filename;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return Math.abs(hash).toString(36);
 }
 
 /**

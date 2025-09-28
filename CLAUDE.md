@@ -29,7 +29,7 @@ This is a **WhatsApp AI Assistant** built with Convex as the backend and React (
 
 **Convex Functions (Backend):**
 - `convex/whatsapp.ts` - WhatsApp message handling, Twilio API integration
-- `convex/aiAgent.ts` - AI response generation using OpenAI
+- `convex/agents.ts` - AI agent processing using Convex Agent framework
 - `convex/router.ts` - HTTP API endpoints for Twilio webhooks and REST API
 - `convex/auth.ts` - Authentication configuration
 - `convex/schema.ts` - Database schema definitions

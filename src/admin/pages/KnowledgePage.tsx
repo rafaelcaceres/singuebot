@@ -34,17 +34,17 @@ export const KnowledgePage: React.FC = () => {
   const [selectedTab, setSelectedTab] = useState("documents");
   
   // Queries
-  const documents = useQuery(api.functions.admin.knowledge.getDocuments) || [];
-  const stats = useQuery(api.functions.admin.knowledge.getDocumentStats);
+  const documents = useQuery(api.admin.getKnowledgeDocuments) || [];
+  const stats = useQuery(api.admin.getKnowledgeDocumentStats);
   const processingJobs = useQuery(api.admin.getProcessingJobs) || [];
   
   // Mutations
-  const deleteDocument = useMutation(api.functions.admin.knowledge.deleteDocument);
-  const reindexDocument = useMutation(api.functions.admin.knowledge.reindexDocument);
+  const deleteDocument = useMutation(api.admin.deleteKnowledgeDocument);
+  const reindexDocument = useMutation(api.admin.reindexDocument);
 
   const handleDeleteDocument = async (documentId: string) => {
     try {
-      await deleteDocument({ docId: documentId as Id<"knowledge_docs"> });
+      await deleteDocument({ documentId: documentId as Id<"knowledge_docs"> });
       toast({
         title: "Documento excluído",
         description: "O documento foi removido com sucesso.",
@@ -60,7 +60,7 @@ export const KnowledgePage: React.FC = () => {
 
   const handleReindexDocument = async (documentId: string) => {
     try {
-      await reindexDocument({ docId: documentId as Id<"knowledge_docs"> });
+      await reindexDocument({ documentId: documentId as Id<"knowledge_docs"> });
       toast({
         title: "Reindexação iniciada",
         description: "O documento será reprocessado em breve.",
@@ -80,7 +80,7 @@ export const KnowledgePage: React.FC = () => {
       // since there's no reindexAll function in the backend
       const allDocs = documents || [];
       for (const doc of allDocs) {
-        await reindexDocument({ docId: doc._id });
+        await reindexDocument({ documentId: doc._id });
       }
       toast({
         title: "Reindexação geral iniciada",
@@ -92,6 +92,7 @@ export const KnowledgePage: React.FC = () => {
         description: "Não foi possível iniciar a reindexação geral.",
         variant: "destructive",
       });
+      console.error("Error reindexing all documents:", error);
     }
   };
 

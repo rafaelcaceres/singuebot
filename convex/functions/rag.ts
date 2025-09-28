@@ -1,126 +1,94 @@
+import { components } from "../_generated/api";
+import { RAG } from "@convex-dev/rag";
+import { openai } from "@ai-sdk/openai";
 import { v } from "convex/values";
-import { internalMutation, internalQuery, query } from "../_generated/server";
+import { action, internalAction } from "../_generated/server";
 
-// Internal mutations and queries (can be in regular JS context)
-export const createDocument = internalMutation({
+// Global namespace for all knowledge documents
+const GLOBAL_NAMESPACE = "global_knowledge";
+
+export const rag = new RAG(components.rag, {
+  textEmbeddingModel: openai.embedding("text-embedding-3-small"),
+  embeddingDimension: 1536,
+});
+
+export const insertDocument = action({
   args: {
+    document: v.string(),
     title: v.string(),
-    source: v.string(),
-    tags: v.array(v.string()),
+    hash: v.string(),
+    format: v.optional(v.union(v.literal("pdf"), v.literal("md"), v.literal("txt"))),
   },
   handler: async (ctx, args) => {
-    return await ctx.db.insert("knowledge_docs", {
+    const result = await rag.add(ctx, {
+      namespace: GLOBAL_NAMESPACE,
       title: args.title,
-      source: args.source,
-      tags: args.tags,
-      status: "pending",
-      createdAt: Date.now(),
+      contentHash: args.hash,
+      text: args.document,
+      metadata: {
+        format: args.format || "txt",
+        uploadedAt: Date.now(),
+      },
     });
+    return result;
   },
 });
 
-export const updateDocumentStatus = internalMutation({
+// Search function for tool-based RAG
+export const searchKnowledge = internalAction({
   args: {
-    docId: v.id("knowledge_docs"),
-    status: v.union(v.literal("ingested"), v.literal("pending"), v.literal("failed")),
-  },
-  handler: async (ctx, args) => {
-    await ctx.db.patch(args.docId, {
-      status: args.status,
-    });
-  },
-});
-
-export const storeChunk = internalMutation({
-  args: {
-    docId: v.id("knowledge_docs"),
-    chunk: v.string(),
-    embedding: v.array(v.float64()),
-    tags: v.object({
-      asa: v.optional(v.string()),
-      tema: v.optional(v.string()),
-      nivel: v.optional(v.string()),
-    }),
-  },
-  handler: async (ctx, args) => {
-    return await ctx.db.insert("knowledge_chunks", {
-      docId: args.docId,
-      chunk: args.chunk,
-      embedding: args.embedding,
-      tags: args.tags,
-    });
-  },
-});
-
-export const vectorSearch = internalQuery({
-  args: {
-    queryVector: v.array(v.float64()),
-    topK: v.number(),
-    filters: v.optional(v.object({
-      asa: v.optional(v.string()),
-      tema: v.optional(v.string()),
-      nivel: v.optional(v.string()),
-    })),
-  },
-  returns: v.array(v.object({
-    chunk: v.string(),
-    score: v.number(),
-    tags: v.object({
-      asa: v.optional(v.string()),
-      tema: v.optional(v.string()),
-      nivel: v.optional(v.string()),
-    }),
-    docTitle: v.string(),
-    docId: v.id("knowledge_docs"),
-  })),
-  handler: async (ctx, args) => {
-    // Simplified implementation for now
-    const allChunks = await ctx.db.query("knowledge_chunks").collect();
-    
-    // Return top results (placeholder implementation)
-    const topResults = allChunks.slice(0, args.topK);
-
-    // Enrich results with document information
-    const enrichedResults = [];
-    for (const result of topResults) {
-      const doc = await ctx.db.get(result.docId);
-      enrichedResults.push({
-        chunk: result.chunk,
-        score: 0.8, // Placeholder score
-        tags: result.tags,
-        docTitle: doc?.title || "Unknown Document",
-        docId: result.docId,
-      });
-    }
-
-    return enrichedResults;
-  },
-});
-
-// Public queries for admin interface
-export const getDocuments = query({
-  args: {
+    query: v.string(),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const limit = args.limit || 50;
-    return await ctx.db
-      .query("knowledge_docs")
-      .order("desc")
-      .take(limit);
+    const results = await rag.search(ctx, {
+      namespace: GLOBAL_NAMESPACE,
+      query: args.query,
+      limit: args.limit ?? 5,
+    });
+    // add a search icon in console bellow
+    console.log("🔎 RAG search results:", results);
+    return results.results.map((result: any) => ({
+      content: result.content?.[0]?.text || "",
+      score: result.score,
+      title: result.content?.[0]?.metadata?.title || "Untitled",
+      metadata: result.content?.[0]?.metadata || {},
+    }));
   },
 });
 
-export const getDocumentChunks = query({
+// Replace document with new content
+export const replaceDocument = action({
   args: {
-    docId: v.id("knowledge_docs"),
-    limit: v.optional(v.number()),
+    document: v.string(),
+    title: v.string(),
+    hash: v.string(),
+    format: v.optional(v.union(v.literal("pdf"), v.literal("md"), v.literal("txt"))),
   },
   handler: async (ctx, args) => {
-    const limit = args.limit || 20;
-    return await ctx.db
-      .query("knowledge_chunks")
-      .withIndex("by_doc", q => q.eq("docId", args.docId))
-      .take(limit);
+    // Remove existing document with same hash/title and add new one
+    const result = await rag.add(ctx, {
+      namespace: GLOBAL_NAMESPACE,
+      title: args.title,
+      contentHash: args.hash,
+      text: args.document,
+      metadata: {
+        format: args.format || "txt",
+        uploadedAt: Date.now(),
+        replaced: true,
+      },
+    });
+    return result;
   },
 });
+
+// Get all documents in the global namespace
+export const listDocuments = action({
+  args: {},
+  handler: async (ctx, args) => {
+    // This would need to be implemented based on Convex RAG's document listing capabilities
+    // For now, return a placeholder
+    return [];
+  },
+});
+

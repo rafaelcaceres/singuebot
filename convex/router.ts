@@ -12,7 +12,7 @@ http.route({
     try {
       const body = await request.text();
       const params = new URLSearchParams(body);
-      
+
       const messageData = {
         messageId: params.get("MessageSid") || "",
         from: params.get("From") || "",
@@ -26,7 +26,7 @@ http.route({
       // Process message with enhanced Twilio integration
       if (messageData.body && messageData.body.trim()) {
         console.log("📅 Processing inbound WhatsApp message:", messageData.messageId);
-        
+
         // Use the new enhanced Twilio processing
         await ctx.scheduler.runAfter(0, internal.functions.twilio.processInboundMessage, {
           messageId: messageData.messageId,
@@ -69,9 +69,14 @@ http.route({
       const status = params.get("MessageStatus");
 
       if (messageId && status) {
+        // Map Twilio status to our expected values
+        const mappedStatus = status === "queued" || status === "accepted" ? "sent" : 
+                           status === "undelivered" ? "failed" : 
+                           status as "received" | "processing" | "sent" | "delivered" | "read" | "failed";
+
         await ctx.runMutation(api.whatsapp.updateMessageStatus, {
           messageId,
-          status,
+          status: mappedStatus,
         });
       }
 
@@ -171,6 +176,7 @@ http.route({
   path: "/whatsapp/contacts",
   method: "GET",
   handler: httpAction(async (ctx, request) => {
+    console.log("Fetching contacts...", request.url);
     try {
       const contacts = await ctx.runQuery(api.whatsapp.getContacts);
 
@@ -201,7 +207,7 @@ http.route({
       const phoneNumber = url.searchParams.get("phoneNumber");
       const limit = parseInt(url.searchParams.get("limit") || "50");
 
-      const interactions = await ctx.runQuery(api.aiAgent.getAIInteractions, {
+      const interactions = await ctx.runQuery(api.agents.getAIInteractions, {
         phoneNumber: phoneNumber || undefined,
         limit,
       });

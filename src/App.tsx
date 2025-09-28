@@ -209,7 +209,7 @@ function WhatsAppDashboard() {
 }
 
 function AILogsPanel({ selectedContact }: { selectedContact: string }) {
-  const aiLogs = useQuery(api.aiAgent.getAIInteractions, {
+  const aiLogs = useQuery(api.agents.getAIInteractions, {
     phoneNumber: selectedContact || undefined,
     limit: 20,
   }) || [];

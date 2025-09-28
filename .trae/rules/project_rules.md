@@ -61,7 +61,7 @@ This is a WhatsApp AI Assistant built with Convex backend, React frontend, Twili
 convex/
 ├── schema.ts          # Database schema definitions
 ├── whatsapp.ts        # WhatsApp message operations
-├── aiAgent.ts         # AI processing logic
+├── agents.ts         # AI agent processing with Convex Agent framework
 ├── router.ts          # HTTP webhook endpoints
 ├── auth.ts            # Authentication configuration
 └── http.ts            # HTTP router setup

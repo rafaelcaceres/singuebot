@@ -1,7 +1,7 @@
 "use node";
 
 import { v } from "convex/values";
-import { action, httpAction, internalAction, internalMutation, internalQuery } from "../_generated/server";
+import { action, internalAction } from "../_generated/server";
 import { internal, api } from "../_generated/api";
 
 // Twilio Configuration
@@ -11,6 +11,64 @@ const TWILIO_CONFIG = {
   fromNumber: process.env.TWILIO_WHATSAPP_NUMBER,
   webhookSecret: process.env.TWILIO_WEBHOOK_SECRET,
 };
+
+/**
+ * Fetch template details from Twilio Content API
+ */
+export const fetchTemplateDetails = action({
+  args: {
+    contentSid: v.string(),
+  },
+  returns: v.object({
+    sid: v.string(),
+    friendlyName: v.string(),
+    language: v.string(),
+    variables: v.array(v.object({
+      key: v.string(),
+      type: v.string(),
+    })),
+    types: v.object({
+      twilio_text: v.object({
+        body: v.string(),
+      }),
+    }),
+  }),
+  handler: async (ctx, args) => {
+    try {
+      console.log("🔍 Twilio: Fetching template details for", args.contentSid);
+
+      const response = await fetch(
+         `https://content.twilio.com/v1/Content/${args.contentSid}`,
+         {
+           method: "GET",
+           headers: {
+             Authorization: `Basic ${Buffer.from(
+               `${TWILIO_CONFIG.accountSid!}:${TWILIO_CONFIG.authToken!}`
+             ).toString("base64")}`,
+           },
+         }
+       );
+
+      if (!response.ok) {
+        throw new Error(`Twilio API error: ${response.status} ${response.statusText}`);
+      }
+
+      const templateData = await response.json();
+      console.log("✅ Twilio: Template details fetched successfully");
+
+      return {
+        sid: templateData.sid,
+        friendlyName: templateData.friendly_name,
+        language: templateData.language,
+        variables: templateData.variables || [],
+        types: templateData.types,
+      };
+    } catch (error) {
+      console.error("❌ Twilio: Failed to fetch template details:", error);
+      throw new Error(`Failed to fetch template details: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  },
+});
 
 /**
  * Process inbound WhatsApp message (called from router.ts)
@@ -30,11 +88,12 @@ export const processInboundMessage = internalAction({
       console.log("📱 Twilio: Processing inbound message from", args.from);
 
       // Store the message first
-      await ctx.runMutation(api.whatsapp.storeIncomingMessage, {
+      await ctx.runMutation(api.whatsapp.storeInboundMessage, {
         messageId: args.messageId,
         from: args.from,
         to: args.to,
         body: args.body,
+        messageType: "text", // Default message type
         mediaUrl: args.mediaUrl,
         mediaContentType: args.mediaContentType,
         twilioData: args.twilioData,
@@ -87,17 +146,28 @@ export const processInboundMessage = internalAction({
       const window = await checkMessageWindow(args.from);
       console.log(`📱 Twilio: Message window for ${args.from}: ${window.window}`);
 
-      if (window.mustUseHSM) {
-        // Outside 24h window - must use HSM template
-        await handleOutsideWindowMessage(ctx, participant._id, args.body, args.messageId);
-      } else {
-        // Within 24h window - can send session messages
-        await handleWithinWindowMessage(ctx, participant._id, args.body, args.messageId, args.from);
-      }
+      // Process message using the modern AI system (works for both within and outside 24h window)
+      await ctx.runAction(internal.agents.processIncomingMessage, {
+        messageId: args.messageId,
+        from: args.from,
+        to: TWILIO_CONFIG.fromNumber || "",
+        body: args.body,
+      });
+
+      // Log analytics event
+      await ctx.runMutation(internal.functions.twilio_db.logAnalyticsEvent, {
+        type: window.mustUseHSM ? "message_outside_window" : "message_within_window",
+        refId: participant._id,
+        meta: {
+          messageLength: args.body.length,
+          processingType: "agents_system",
+          windowType: window.window,
+        },
+      });
 
     } catch (error) {
       console.error("📱 Twilio: Error processing inbound message:", error);
-      
+
       // Send fallback message
       try {
         await ctx.runAction(api.functions.twilio.sendMessage, {
@@ -110,88 +180,6 @@ export const processInboundMessage = internalAction({
     }
   },
 });
-
-/**
- * Handle message within 24h window (can use session messages)
- */
-async function handleWithinWindowMessage(
-  ctx: any,
-  participantId: string,
-  body: string,
-  messageId: string,
-  phoneNumber: string
-) {
-  console.log("🕐 Twilio: Handling message within 24h window");
-
-  // Process with interview system
-  const interviewResponse = await ctx.runAction(internal.functions.interview.handleInbound, {
-    participantId,
-    text: body,
-    messageId,
-  });
-
-  // Send interview response
-  await ctx.runAction(api.functions.twilio.sendMessage, {
-    to: phoneNumber,
-    body: interviewResponse.response,
-  });
-
-  // Log analytics event
-  await ctx.runMutation(internal.functions.twilio_db.logAnalyticsEvent, {
-    type: "message_within_window",
-    refId: participantId,
-    meta: {
-      stage: interviewResponse.nextStage,
-      contextUsed: interviewResponse.contextUsed,
-      messageLength: body.length,
-    },
-  });
-}
-
-/**
- * Handle message outside 24h window (must use HSM template)
- */
-async function handleOutsideWindowMessage(
-  ctx: any,
-  participantId: string,
-  body: string,
-  messageId: string
-) {
-  console.log("🕛 Twilio: Handling message outside 24h window - using HSM");
-
-  // Get participant session to determine appropriate template
-  const session = await ctx.runQuery(api.functions.interview.getParticipantSession, {
-    participantId,
-  });
-
-  const stage = session?.step || "intro";
-  
-  // Get appropriate HSM template for stage
-  const template = await ctx.runQuery(internal.functions.twilio_db.getTemplateForStage, {
-    stage,
-    locale: "pt-BR",
-  });
-
-  if (template) {
-    await ctx.runAction(api.functions.twilio.sendTemplate, {
-      to: `whatsapp:${participantId}`, // This should be the phone number
-      templateName: template.name,
-      variables: {
-        stage: stage,
-        name: "participante", // Can be enhanced with actual name
-      },
-    });
-  } else {
-    console.warn(`📱 Twilio: No HSM template found for stage: ${stage}`);
-    
-    // Schedule a follow-up job to send when window reopens
-    await ctx.scheduler.runAfter(24 * 60 * 60 * 1000, internal.functions.twilio.scheduleFollowUp, {
-      participantId,
-      originalMessage: body,
-      originalMessageId: messageId,
-    });
-  }
-}
 
 /**
  * Send regular WhatsApp message (within 24h window)
@@ -250,7 +238,7 @@ export const sendMessage = action({
       from: fromNumber,
       to: toNumber,
       body: args.body,
-      status: twilioResponse.status,
+      messageType: "text", // Default message type
       mediaUrl: args.mediaUrl,
       twilioData: twilioResponse,
     });
@@ -291,16 +279,35 @@ export const sendTemplate = action({
       ? args.to 
       : `whatsapp:${args.to}`;
 
-    // Build template variables string
-    const templateVariables = template.variables
-      .map((varName: string) => args.variables[varName] || "")
-      .join("|");
+    // Convert named variables to positional variables for Twilio HSM
+    const positionalVariables: Record<string, string> = {};
+    
+    // Use variable mappings from template configuration if available
+    if (template.variableMappings && Array.isArray(template.variableMappings)) {
+      template.variableMappings.forEach((mapping: any) => {
+        const value = args.variables[mapping.templateVariable];
+        if (value !== undefined) {
+          // Use the template variable as the key (should be numeric for Twilio)
+          positionalVariables[mapping.templateVariable] = value;
+        }
+      });
+    } else if (template.variables && Array.isArray(template.variables)) {
+      // Fallback to original variables array for backward compatibility
+      template.variables.forEach((variableName: string, index: number) => {
+        const value = args.variables[variableName];
+        if (value !== undefined) {
+          // Twilio uses 1-based indexing for template variables
+          positionalVariables[(index + 1).toString()] = value;
+        }
+      });
+    }
+    console.log("📱 Twilio: Sending template", args.templateName, "to", args.to, "with variables", args.variables);
 
     const messageData: URLSearchParams = new URLSearchParams({
       From: fromNumber,
       To: toNumber,
       ContentSid: template.twilioId,
-      ContentVariables: JSON.stringify(args.variables),
+      ContentVariables: JSON.stringify(positionalVariables),
     });
 
     const response: Response = await fetch(
@@ -328,11 +335,146 @@ export const sendTemplate = action({
       from: fromNumber,
       to: toNumber,
       body: `[HSM Template: ${args.templateName}]`,
-      status: twilioResponse.status,
+      messageType: "template", // Template message type
       twilioData: twilioResponse,
     });
 
     return twilioResponse;
+  },
+});
+
+/**
+ * Send template to multiple participants
+ */
+export const sendTemplateToMultipleParticipants = action({
+  args: {
+    participantIds: v.array(v.id("participants")),
+    templateName: v.string(),
+    variables: v.optional(v.object({
+      nome: v.optional(v.string()),
+      email: v.optional(v.string()),
+      cargo: v.optional(v.string()),
+    })),
+  },
+  returns: v.object({
+    success: v.array(v.object({
+      participantId: v.id("participants"),
+      phone: v.string(),
+      messageId: v.string(),
+    })),
+    failed: v.array(v.object({
+      participantId: v.id("participants"),
+      phone: v.string(),
+      error: v.string(),
+    })),
+    total: v.number(),
+  }),
+  handler: async (ctx, args) => {
+    const results = {
+      success: [] as Array<{participantId: any, phone: string, messageId: string}>,
+      failed: [] as Array<{participantId: any, phone: string, error: string}>,
+      total: args.participantIds.length,
+    };
+
+    // Get template configuration with variable mappings
+    const templateConfig = await ctx.runQuery(api.functions.templateConfig.getTemplateConfigByName, {
+      templateName: args.templateName,
+    });
+
+    if (!templateConfig) {
+      // If template not found, mark all as failed
+      for (const participantId of args.participantIds) {
+        const participant = await ctx.runQuery(internal.functions.twilio_db.getParticipant, { participantId });
+        results.failed.push({
+          participantId,
+          phone: participant?.phone || "unknown",
+          error: `Template configuration not found: ${args.templateName}`,
+        });
+      }
+      return results;
+    }
+
+    // Process each participant
+    for (const participantId of args.participantIds) {
+      try {
+        // Get participant details
+        const participant = await ctx.runQuery(internal.functions.twilio_db.getParticipant, { participantId });
+        
+        if (!participant) {
+          results.failed.push({
+            participantId,
+            phone: "unknown",
+            error: "Participant not found",
+          });
+          continue;
+        }
+
+        // Map participant data to template variables using stored mappings
+        const participantVariables: Record<string, string> = {};
+        
+        console.log("🔍 Template config:", templateConfig);
+        console.log("🔍 Participant data:", participant);
+        
+        // Use the stored variable mappings from template configuration
+        if (templateConfig.variableMappings) {
+          for (const mapping of templateConfig.variableMappings) {
+            let value = "";
+            
+            // Get value from participant field
+            if (mapping.participantField) {
+              const fieldValue = participant[mapping.participantField as keyof typeof participant];
+              value = fieldValue ? String(fieldValue) : "";
+              console.log(`🔍 Mapping ${mapping.templateVariable} from ${mapping.participantField}: "${value}"`);
+            }
+            
+            // Use manual override if provided
+            if (args.variables && args.variables[mapping.templateVariable as keyof typeof args.variables]) {
+              value = args.variables[mapping.templateVariable as keyof typeof args.variables] as string;
+              console.log(`🔍 Manual override for ${mapping.templateVariable}: "${value}"`);
+            }
+            
+            // Use default value if no value found and default is provided
+            if (!value && mapping.defaultValue) {
+              value = mapping.defaultValue;
+              console.log(`🔍 Using default value for ${mapping.templateVariable}: "${value}"`);
+            }
+            
+            // If required and still no value, use a fallback
+            if (!value && mapping.isRequired) {
+              value = mapping.participantField === "name" ? "Participante" : "";
+              console.log(`🔍 Using fallback for required ${mapping.templateVariable}: "${value}"`);
+            }
+            
+            participantVariables[mapping.templateVariable] = value;
+          }
+        }
+        
+        console.log("🔍 Final participant variables:", participantVariables);
+
+        // Send template using existing sendTemplate function
+        const twilioResponse = await ctx.runAction(api.functions.twilio.sendTemplate, {
+          to: participant.phone,
+          templateName: args.templateName,
+          variables: participantVariables,
+        });
+
+        results.success.push({
+          participantId,
+          phone: participant.phone,
+          messageId: twilioResponse.sid,
+        });
+
+      } catch (error) {
+        const participant = await ctx.runQuery(internal.functions.twilio_db.getParticipant, { participantId });
+        results.failed.push({
+          participantId,
+          phone: participant?.phone || "unknown",
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
+      }
+    }
+
+    return results;
   },
 });
 
@@ -348,13 +490,23 @@ export const scheduleFollowUp = internalAction({
     // This would be called after 24h to process the delayed message
     const participant = await ctx.runQuery(internal.functions.twilio_db.getParticipant, { participantId: args.participantId });
     if (participant) {
-      await handleWithinWindowMessage(
-        ctx,
-        args.participantId,
-        args.originalMessage,
-        args.originalMessageId,
-        participant.phone
-      );
+      // Process the follow-up message using the modern AI system
+      await ctx.runAction(internal.agents.processIncomingMessage, {
+        messageId: args.originalMessageId,
+        from: participant.phone,
+        to: TWILIO_CONFIG.fromNumber || "",
+        body: args.originalMessage,
+      });
+
+      // Log analytics event
+      await ctx.runMutation(internal.functions.twilio_db.logAnalyticsEvent, {
+        type: "follow_up_message",
+        refId: args.participantId,
+        meta: {
+          messageLength: args.originalMessage.length,
+          processingType: "agents_system",
+        },
+      });
     }
   },
 });
@@ -379,19 +531,11 @@ async function checkMessageWindow(phoneNumber: string): Promise<{
 }> {
   // Simple implementation - in production, this would check last message timestamp
   // For now, assume within window (can be enhanced with proper tracking)
+  console.log("📱 Twilio: Checking message window for", phoneNumber);
   
   return {
     window: "within_24h",
     canSendSession: true,
     mustUseHSM: false,
   };
-}
-
-// Webhook signature verification (for production)
-function verifyTwilioSignature(signature: string, url: string, params: any): boolean {
-  if (!TWILIO_CONFIG.webhookSecret) return true; // Skip verification if no secret
-  
-  // Implementation would verify X-Twilio-Signature header
-  // Using crypto.createHmac('sha1', webhookSecret)
-  return true; // Placeholder
 }

@@ -12,8 +12,12 @@ import {
   type SortingState,
   type ColumnFiltersState,
 } from '@tanstack/react-table';
+import { Plus, MessageSquare } from 'lucide-react';
 import { api } from '../../../convex/_generated/api';
 import { ConversationViewer } from '../components/ConversationViewer';
+import { AddParticipantForm } from '../components/AddParticipantForm';
+import { EditParticipantForm } from '../components/EditParticipantForm';
+import { TemplateModal } from '../components/TemplateModal';
 import { usePermissions } from '../../hooks/useAuth';
 
 interface Participant {
@@ -27,6 +31,9 @@ interface Participant {
   cluster?: { id: string; name: string } | null;
   tags: string[];
   createdAt: number;
+  cargo?: string;
+  empresa?: string;
+  setor?: string;
 }
 
 const columnHelper = createColumnHelper<Participant>();
@@ -41,6 +48,12 @@ export const Participants: React.FC = () => {
     pageSize: 25,
   });
   const [selectedParticipant, setSelectedParticipant] = useState<string | null>(null);
+  const [isAddParticipantOpen, setIsAddParticipantOpen] = useState(false);
+  const [editParticipantId, setEditParticipantId] = useState<string | null>(null);
+  
+  // Multi-selection state
+  const [selectedParticipants, setSelectedParticipants] = useState<Set<string>>(new Set());
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
 
   // Filters state
   const [clusterFilter, setClusterFilter] = useState<string>('');
@@ -61,8 +74,56 @@ export const Participants: React.FC = () => {
   // Mutations
   const deleteParticipantMutation = useMutation(api.admin.deleteParticipant);
 
+  // Selection handlers
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      const allIds = new Set(participantsData?.participants?.map(p => p._id) || []);
+      setSelectedParticipants(allIds);
+    } else {
+      setSelectedParticipants(new Set());
+    }
+  };
+
+  const handleSelectParticipant = (participantId: string, checked: boolean) => {
+    const newSelection = new Set(selectedParticipants);
+    if (checked) {
+      newSelection.add(participantId);
+    } else {
+      newSelection.delete(participantId);
+    }
+    setSelectedParticipants(newSelection);
+  };
+
+  const isAllSelected = (participantsData?.participants?.length ?? 0) > 0 && 
+    participantsData?.participants?.every(p => selectedParticipants.has(p._id)) === true;
+  
+  const isIndeterminate = selectedParticipants.size > 0 && !isAllSelected;
+
   const columns = useMemo<ColumnDef<Participant, any>[]>(
     () => [
+      // Checkbox column
+      columnHelper.display({
+        id: 'select',
+        header: ({ table }) => (
+          <input
+            type="checkbox"
+            checked={isAllSelected}
+            ref={(el) => {
+              if (el) el.indeterminate = isIndeterminate;
+            }}
+            onChange={(e) => handleSelectAll(e.target.checked)}
+            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+          />
+        ),
+        cell: ({ row }) => (
+          <input
+            type="checkbox"
+            checked={selectedParticipants.has(row.original._id)}
+            onChange={(e) => handleSelectParticipant(row.original._id, e.target.checked)}
+            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+          />
+        ),
+      }),
       columnHelper.accessor('name', {
         header: 'Nome',
         cell: (info) => info.getValue() || 'Sem nome',
@@ -136,6 +197,21 @@ export const Participants: React.FC = () => {
         },
         enableSorting: true,
       }),
+      columnHelper.accessor('cargo', {
+        header: 'Cargo',
+        cell: (info) => info.getValue() || '-',
+        enableSorting: true,
+      }),
+      columnHelper.accessor('empresa', {
+        header: 'Empresa',
+        cell: (info) => info.getValue() || '-',
+        enableSorting: true,
+      }),
+      columnHelper.accessor('setor', {
+        header: 'Setor',
+        cell: (info) => info.getValue() || '-',
+        enableSorting: true,
+      }),
       columnHelper.accessor('lastMessageAt', {
         header: 'Última mensagem',
         cell: (info) => {
@@ -168,6 +244,14 @@ export const Participants: React.FC = () => {
             >
               Ver conversa
             </button>
+            {canManageUsers && (
+              <button
+                onClick={() => setEditParticipantId(info.row.original._id)}
+                className="text-green-600 hover:text-green-800 text-sm font-medium"
+              >
+                Editar
+              </button>
+            )}
             {canDeleteData && (
               <button
                 onClick={() => void handleDeleteParticipant(info.row.original._id)}
@@ -180,7 +264,7 @@ export const Participants: React.FC = () => {
         ),
       }),
     ],
-    [canDeleteData]
+    [canDeleteData, canManageUsers, selectedParticipants, isAllSelected, isIndeterminate, handleSelectAll, handleSelectParticipant]
   );
 
   const table = useReactTable({
@@ -223,12 +307,15 @@ export const Participants: React.FC = () => {
     if (!participantsData?.participants) return;
     
     // Create CSV content
-    const headers = ['Nome', 'Telefone', 'Estágio', 'Cluster', 'Consentimento', 'Última Mensagem', 'Data de Criação'];
+    const headers = ['Nome', 'Telefone', 'Cargo', 'Empresa', 'Setor', 'Estágio', 'Cluster', 'Consentimento', 'Última Mensagem', 'Data de Criação'];
     const csvContent = [
       headers.join(','),
       ...participantsData.participants.map(participant => [
         participant.name || 'Sem nome',
         participant.phone.replace('whatsapp:', ''),
+        participant.cargo || '-',
+        participant.empresa || '-',
+        participant.setor || '-',
         participant.currentStage,
         participant.cluster?.name || 'Sem cluster',
         participant.consent ? 'Sim' : 'Não',
@@ -264,6 +351,24 @@ export const Participants: React.FC = () => {
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-900">Participantes</h1>
         <div className="flex space-x-3">
+          {selectedParticipants.size > 0 && (
+            <button
+              onClick={() => setIsTemplateModalOpen(true)}
+              className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 flex items-center gap-2"
+            >
+              <MessageSquare className="h-4 w-4" />
+              Enviar Template ({selectedParticipants.size})
+            </button>
+          )}
+          {canManageUsers && (
+            <button
+              onClick={() => setIsAddParticipantOpen(true)}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Adicionar Participante
+            </button>
+          )}
           <button
             onClick={handleExportData}
             className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
@@ -466,6 +571,33 @@ export const Participants: React.FC = () => {
           onClose={() => setSelectedParticipant(null)}
         />
       )}
+
+      {/* Add Participant Modal */}
+      <AddParticipantForm
+        open={isAddParticipantOpen}
+        onOpenChange={setIsAddParticipantOpen}
+      />
+
+      {/* Edit Participant Form */}
+      <EditParticipantForm
+        open={!!editParticipantId}
+        onOpenChange={(open) => !open && setEditParticipantId(null)}
+        participantId={editParticipantId as any}
+        onSuccess={() => {
+          setEditParticipantId(null);
+          // Refresh data by triggering a re-fetch
+          window.location.reload();
+        }}
+      />
+
+      {/* Template Modal */}
+      <TemplateModal
+        open={isTemplateModalOpen}
+        onOpenChange={setIsTemplateModalOpen}
+        selectedParticipants={
+          participantsData?.participants?.filter(p => selectedParticipants.has(p._id)) || []
+        }
+      />
     </div>
   );
 };

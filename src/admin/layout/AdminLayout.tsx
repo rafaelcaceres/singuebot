@@ -9,17 +9,30 @@ export function AdminLayout() {
   const location = useLocation();
   const loggedInUser = useQuery(api.auth.loggedInUser);
 
+  console.log("AdminLayout rendering...", { 
+    location: location.pathname, 
+    loggedInUser,
+    userStatus: loggedInUser === undefined ? 'loading' : loggedInUser === null ? 'not-logged' : 'logged-in'
+  });
+
   if (loggedInUser === undefined) {
+    console.log("AdminLayout: User loading...");
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <div className="flex justify-center items-center min-h-screen bg-background">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <p className="text-muted-foreground">Carregando...</p>
+        </div>
       </div>
     );
   }
 
   if (loggedInUser === null) {
+    console.log("AdminLayout: User not logged in, redirecting to login");
     return <Navigate to="/login" replace />;
   }
+
+  console.log("AdminLayout: User logged in, rendering layout");
 
   return (
     <div className="min-h-screen bg-background">

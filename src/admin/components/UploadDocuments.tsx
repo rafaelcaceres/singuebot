@@ -37,18 +37,44 @@ const UploadDocuments: React.FC = () => {
     accept: {
       'text/plain': ['.txt'],
       'application/pdf': ['.pdf'],
-      'application/msword': ['.doc'],
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
       'text/markdown': ['.md'],
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+      'application/msword': ['.doc']
     },
-    maxSize: 10 * 1024 * 1024, // 10MB
+    maxSize: 2 * 1024 * 1024, // 2MB limit
   });
 
   const uploadSingleFile = async (uploadFile: UploadFile) => {
     try {
       setUploadFiles(prev => prev.map(f => 
         f.id === uploadFile.id 
-          ? { ...f, status: 'uploading', progress: 50 }
+          ? { ...f, status: 'uploading', progress: 25 }
+          : f
+      ));
+
+      // Validate file size and type
+      const { validateFile, processDocumentFile, generateContentHash } = await import('../../lib/rag');
+      
+      try {
+        validateFile(uploadFile.file);
+      } catch (validationError) {
+        throw new Error(`Validation failed: ${validationError instanceof Error ? validationError.message : 'Unknown validation error'}`);
+      }
+
+      setUploadFiles(prev => prev.map(f => 
+        f.id === uploadFile.id 
+          ? { ...f, progress: 50 }
+          : f
+      ));
+
+      // Process file content
+      const content = await processDocumentFile(uploadFile.file);
+      const hash = generateContentHash(content, uploadFile.file.name);
+      const format = uploadFile.file.name.split('.').pop()?.toLowerCase() as 'pdf' | 'txt' | 'md';
+
+      setUploadFiles(prev => prev.map(f => 
+        f.id === uploadFile.id 
+          ? { ...f, progress: 75 }
           : f
       ));
 
@@ -57,6 +83,9 @@ const UploadDocuments: React.FC = () => {
         title: uploadFile.file.name,
         source: `upload:${uploadFile.file.name}`,
         tags: ['uploaded'],
+        content,
+        format: format || 'txt',
+        hash,
       });
 
       setUploadFiles(prev => prev.map(f => 

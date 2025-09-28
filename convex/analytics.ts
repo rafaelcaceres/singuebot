@@ -20,7 +20,9 @@ export const getRealTimeMetrics = query({
     
     // Active participants (sent message in last 24h)
     const recentMessages = allMessages.filter(m => m._creationTime >= oneDayAgo);
-    const activeParticipants24h = new Set(recentMessages.map(m => m.from)).size;
+    const activeParticipants24h = new Set(
+      recentMessages.map(m => m.stateSnapshot?.twilioPayload?.From).filter(Boolean)
+    ).size;
 
     // Message volume metrics
     const messagesLast24h = recentMessages.length;
@@ -34,9 +36,15 @@ export const getRealTimeMetrics = query({
       ? (outboundMessages.length / inboundMessages.length) * 100 
       : 0;
 
-    // AI interactions
-    const aiInteractions = await ctx.db.query("aiInteractions").collect();
-    const aiInteractions24h = aiInteractions.filter(ai => ai.timestamp >= oneDayAgo).length;
+    // AI interactions - now from whatsappMessages with aiMetadata
+    const messagesWithAI = await ctx.db
+      .query("whatsappMessages")
+      .filter(q => q.neq(q.field("aiMetadata"), undefined))
+      .collect();
+    
+    const aiInteractions24h = messagesWithAI.filter(msg => 
+      msg.aiMetadata && msg.aiMetadata.timestamp >= oneDayAgo
+    ).length;
 
     // Consent metrics
     const participantsWithConsent = allParticipants.filter(p => p.consent === true).length;
@@ -68,7 +76,7 @@ export const getRealTimeMetrics = query({
         responseRate: Math.round(responseRate * 100) / 100,
       },
       ai: {
-        totalInteractions: aiInteractions.length,
+        totalInteractions: messagesWithAI.length,
         interactions24h: aiInteractions24h,
         avgResponseTime: 1.2, // Placeholder - would calculate from actual data
       },
@@ -235,8 +243,9 @@ export const getSystemHealth = query({
       .collect();
 
     const recentAIInteractions = await ctx.db
-      .query("aiInteractions")
-      .filter(q => q.gte(q.field("timestamp"), oneHourAgo))
+      .query("whatsappMessages")
+      .filter(q => q.gte(q.field("_creationTime"), oneHourAgo))
+      .filter(q => q.neq(q.field("aiMetadata"), undefined))
       .collect();
 
     // Processing jobs status
@@ -260,7 +269,7 @@ export const getSystemHealth = query({
         },
         aiProcessing: {
           status: aiProcessingHealth,
-          lastActivity: recentAIInteractions[0]?.timestamp || null,
+          lastActivity: recentAIInteractions[0]?._creationTime || null,
           throughput: recentAIInteractions.length,
         },
         knowledgeProcessing: {
@@ -291,7 +300,8 @@ export const getTopParticipants = query({
     const participantMetrics = await Promise.all(
       participants.map(async (participant) => {
         const participantMessages = allMessages.filter(
-          m => m.from === participant.phone || m.to === participant.phone
+          m => m.stateSnapshot?.twilioPayload?.From === participant.phone || 
+               m.stateSnapshot?.twilioPayload?.To === participant.phone
         );
         
         const messageCount = participantMessages.length;
@@ -351,12 +361,16 @@ export const getRecentActivity = query({
       .order("desc")
       .take(limit);
 
-    // Get recent AI interactions
+    // Get recent AI interactions from whatsappMessages with aiMetadata
     const recentAI = await ctx.db
-      .query("aiInteractions")
-      .filter(q => q.gte(q.field("timestamp"), oneDayAgo))
+      .query("whatsappMessages")
+      .filter(q => q.neq(q.field("aiMetadata"), undefined))
       .order("desc")
-      .take(limit);
+      .take(limit * 2); // Get more to filter by timestamp
+
+    const filteredAI = recentAI
+      .filter(msg => msg.aiMetadata && msg.aiMetadata.timestamp >= oneDayAgo)
+      .slice(0, limit);
 
     // Get recent participants
     const recentParticipants = await ctx.db
@@ -372,17 +386,17 @@ export const getRecentActivity = query({
         timestamp: msg._creationTime,
         description: `${msg.direction === "inbound" ? "Received" : "Sent"} message`,
         details: {
-          phone: msg.from,
+          phone: msg.stateSnapshot?.twilioPayload?.From,
           preview: msg.body.substring(0, 50) + (msg.body.length > 50 ? "..." : ""),
         },
       })),
-      ...recentAI.map(ai => ({
+      ...filteredAI.map(msg => ({
         type: "ai_interaction" as const,
-        timestamp: ai.timestamp,
+        timestamp: msg.aiMetadata!.timestamp,
         description: "AI response generated",
         details: {
-          phone: ai.phoneNumber,
-          preview: ai.aiResponse.substring(0, 50) + (ai.aiResponse.length > 50 ? "..." : ""),
+          phone: msg.stateSnapshot?.twilioPayload?.From,
+          preview: msg.body.substring(0, 50) + (msg.body.length > 50 ? "..." : ""),
         },
       })),
       ...recentParticipants.map(participant => ({
