@@ -14,6 +14,7 @@ import type * as analytics from "../analytics.js";
 import type * as auth from "../auth.js";
 import type * as createAdminUser from "../createAdminUser.js";
 import type * as debug from "../debug.js";
+import type * as functions_audioTranscription from "../functions/audioTranscription.js";
 import type * as functions_interview from "../functions/interview.js";
 import type * as functions_participant_queries from "../functions/participant_queries.js";
 import type * as functions_rag from "../functions/rag.js";
@@ -47,6 +48,7 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   createAdminUser: typeof createAdminUser;
   debug: typeof debug;
+  "functions/audioTranscription": typeof functions_audioTranscription;
   "functions/interview": typeof functions_interview;
   "functions/participant_queries": typeof functions_participant_queries;
   "functions/rag": typeof functions_rag;

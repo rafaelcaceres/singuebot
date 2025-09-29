@@ -87,16 +87,68 @@ export const processInboundMessage = internalAction({
     try {
       console.log("📱 Twilio: Processing inbound message from", args.from);
 
-      // Store the message first
+      // Check if this is an audio message and transcribe if needed
+      let processedBody = args.body;
+      let audioTranscription = undefined;
+      
+      if (args.mediaUrl && args.mediaContentType) {
+        const { isAudioMessage } = await import("./audioTranscription");
+        
+        if (isAudioMessage(args.mediaContentType)) {
+          console.log("🎵 Twilio: Audio message detected, starting transcription...");
+          
+          try {
+             const transcriptionResult = await ctx.runAction(internal.functions.audioTranscription.transcribeAudio, {
+               mediaUrl: args.mediaUrl,
+               mediaContentType: args.mediaContentType,
+               twilioAccountSid: TWILIO_CONFIG.accountSid!,
+               twilioAuthToken: TWILIO_CONFIG.authToken!,
+             });
+             
+             if (transcriptionResult.success && transcriptionResult.transcription) {
+               processedBody = transcriptionResult.transcription;
+               audioTranscription = {
+                 originalMediaUrl: args.mediaUrl,
+                 transcribedText: transcriptionResult.transcription,
+                 processingTimeMs: transcriptionResult.processingTimeMs,
+                 success: true,
+                 audioMetadata: transcriptionResult.audioMetadata,
+               };
+               console.log("✅ Twilio: Audio transcribed successfully");
+             } else {
+               audioTranscription = {
+                 originalMediaUrl: args.mediaUrl,
+                 transcribedText: "",
+                 processingTimeMs: transcriptionResult.processingTimeMs,
+                 success: false,
+                 error: transcriptionResult.error || "Transcription failed",
+               };
+               console.log("❌ Twilio: Audio transcription failed:", transcriptionResult.error);
+             }
+          } catch (error) {
+            console.error("❌ Twilio: Error during audio transcription:", error);
+            audioTranscription = {
+              originalMediaUrl: args.mediaUrl,
+              transcribedText: "",
+              processingTimeMs: 0,
+              success: false,
+              error: error instanceof Error ? error.message : String(error),
+            };
+          }
+        }
+      }
+
+      // Store the message with transcription data if available
       await ctx.runMutation(api.whatsapp.storeInboundMessage, {
         messageId: args.messageId,
         from: args.from,
         to: args.to,
-        body: args.body,
-        messageType: "text", // Default message type
+        body: processedBody, // Use transcribed text if available
+        messageType: audioTranscription ? "audio" : "text",
         mediaUrl: args.mediaUrl,
         mediaContentType: args.mediaContentType,
         twilioData: args.twilioData,
+        audioTranscription,
       });
 
       // Get or create participant
@@ -151,7 +203,7 @@ export const processInboundMessage = internalAction({
         messageId: args.messageId,
         from: args.from,
         to: TWILIO_CONFIG.fromNumber || "",
-        body: args.body,
+        body: processedBody, // Use transcribed text if available
       });
 
       // Log analytics event

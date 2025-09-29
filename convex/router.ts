@@ -12,6 +12,7 @@ http.route({
     try {
       const body = await request.text();
       const params = new URLSearchParams(body);
+      console.log("Received WhatsApp webhook with params:", params);
 
       const messageData = {
         messageId: params.get("MessageSid") || "",
@@ -24,8 +25,13 @@ http.route({
       };
 
       // Process message with enhanced Twilio integration
-      if (messageData.body && messageData.body.trim()) {
-        console.log("📅 Processing inbound WhatsApp message:", messageData.messageId);
+      // Process if there's text content OR if it's a media message (like audio)
+      const hasTextContent = messageData.body && messageData.body.trim();
+      const hasMediaContent = messageData.mediaUrl && messageData.mediaContentType;
+      
+      if (hasTextContent || hasMediaContent) {
+        const messageType = hasMediaContent ? `${messageData.mediaContentType} media` : 'text';
+        console.log(`📅 Processing inbound WhatsApp ${messageType} message:`, messageData.messageId);
 
         // Use the new enhanced Twilio processing
         await ctx.scheduler.runAfter(0, internal.functions.twilio.processInboundMessage, {
@@ -37,6 +43,8 @@ http.route({
           mediaContentType: messageData.mediaContentType,
           twilioData: messageData.twilioData,
         });
+      } else {
+        console.log("⚠️ Skipping message - no text or media content:", messageData.messageId);
       }
 
       // Return TwiML response (acknowledge receipt)

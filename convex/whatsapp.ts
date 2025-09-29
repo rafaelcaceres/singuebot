@@ -237,6 +237,18 @@ export const storeInboundMessage = mutation({
     mediaContentType: v.optional(v.string()),
     twilioData: v.any(),
     threadId: v.optional(v.string()),
+    audioTranscription: v.optional(v.object({
+      originalMediaUrl: v.string(),
+      transcribedText: v.string(),
+      processingTimeMs: v.number(),
+      success: v.boolean(),
+      error: v.optional(v.string()),
+      audioMetadata: v.optional(v.object({
+        duration: v.optional(v.number()),
+        fileSize: v.optional(v.number()),
+        format: v.string(),
+      })),
+    })),
   },
   handler: async (ctx, args): Promise<Id<"whatsappMessages">> => {
     // Create or get participant
@@ -260,6 +272,7 @@ export const storeInboundMessage = mutation({
       status: "received",
       mediaUrl: args.mediaUrl,
       mediaContentType: args.mediaContentType,
+      audioTranscription: args.audioTranscription,
       stateSnapshot: {
         twilioPayload: {
           MessageSid: args.twilioData.MessageSid || args.messageId,

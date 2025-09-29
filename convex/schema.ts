@@ -33,6 +33,20 @@ const applicationTables = {
     mediaContentType: v.optional(v.string()), // Content type of media
     twilioData: v.optional(v.any()), // Raw Twilio webhook data
     
+    // Audio transcription metadata
+    audioTranscription: v.optional(v.object({
+      originalMediaUrl: v.string(), // Original Twilio media URL
+      transcribedText: v.string(), // Transcribed text content
+      processingTimeMs: v.number(), // Time taken to transcribe
+      success: v.boolean(), // Whether transcription was successful
+      error: v.optional(v.string()), // Error message if transcription failed
+      audioMetadata: v.optional(v.object({
+        duration: v.optional(v.number()), // Audio duration in seconds
+        fileSize: v.optional(v.number()), // File size in bytes
+        format: v.string(), // Audio format/content type
+      })),
+    })),
+    
     // Structured state snapshot for processing tracking
     stateSnapshot: v.optional(v.object({
       twilioPayload: v.object({
