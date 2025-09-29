@@ -78,10 +78,6 @@ const getOrCreateThread = async (
  * Functional helper to get or create a session for a participant
  * Uses immutable patterns and proper error handling
  */
-/**
- * Functional helper to get or create session with minimal database calls
- * Uses a more elegant approach with proper error handling
- */
 const getOrCreateSession = async (
   ctx: any,
   participantId: string
