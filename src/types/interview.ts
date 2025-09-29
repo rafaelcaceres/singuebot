@@ -1,12 +1,8 @@
 export type InterviewStage = 
   | "intro"
-  | "ASA"
-  | "listas" 
-  | "pre_evento"
-  | "diaD"
-  | "pos_24h"
-  | "pos_7d"
-  | "pos_30d";
+  | "termos_confirmacao"
+  | "mapeamento_carreira" 
+  | "finalizacao";
 
 export interface InterviewSession {
   participantId: string;

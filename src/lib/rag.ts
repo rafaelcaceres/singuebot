@@ -180,14 +180,14 @@ export function extractTagsFromFilename(filename: string): string[] {
   const tags: string[] = [];
   const name = filename.toLowerCase();
   
-  // Common patterns
-  if (name.includes('asa')) tags.push('ASA');
+  // Common patterns for career development
   if (name.includes('carreira')) tags.push('carreira');
   if (name.includes('lideranca') || name.includes('liderança')) tags.push('liderança');
   if (name.includes('empreendedorismo')) tags.push('empreendedorismo');
-  if (name.includes('ancestralidade')) tags.push('ancestralidade');
-  if (name.includes('sabedoria')) tags.push('sabedoria');
-  if (name.includes('ascensao') || name.includes('ascensão')) tags.push('ascensão');
+  if (name.includes('desenvolvimento')) tags.push('desenvolvimento');
+  if (name.includes('profissional')) tags.push('profissional');
+  if (name.includes('networking')) tags.push('networking');
+  if (name.includes('mentoria')) tags.push('mentoria');
   
   return tags;
 }
@@ -207,11 +207,11 @@ export function validateRAGQuery(query: string, filters?: any): {valid: boolean,
   }
   
   if (filters) {
-    const validASAValues = ['ancestralidade', 'sabedoria', 'ascensão'];
+    const validTemaValues = ['carreira', 'liderança', 'empreendedorismo', 'desenvolvimento', 'networking'];
     const validNivelValues = ['iniciante', 'intermediario', 'avancado'];
     
-    if (filters.asa && !validASAValues.includes(filters.asa)) {
-      errors.push('Valor ASA inválido');
+    if (filters.tema && !validTemaValues.includes(filters.tema)) {
+      errors.push('Valor de tema inválido');
     }
     
     if (filters.nivel && !validNivelValues.includes(filters.nivel)) {

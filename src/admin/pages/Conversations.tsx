@@ -188,22 +188,17 @@ export const Conversations: React.FC = () => {
           const stageLabels: Record<string, string> = {
             not_started: 'Não iniciado',
             intro: 'Introdução',
-            asa: 'ASA',
-            listas: 'Listas',
-            pre_evento: 'Pré-evento',
-            diaD: 'Dia D',
-            pos_24h: 'Pós 24h',
-            pos_7d: 'Pós 7 dias',
-            pos_30d: 'Pós 30 dias',
+            termos_confirmacao: 'Termos & Confirmação',
+            mapeamento_carreira: 'Mapeamento de Carreira',
+            finalizacao: 'Finalização',
           };
           return (
             <span className={`px-2 py-1 rounded-full text-xs font-medium ${
               stage === 'not_started' ? 'bg-gray-100 text-gray-800' :
               stage === 'intro' ? 'bg-blue-100 text-blue-800' :
-              stage === 'asa' ? 'bg-yellow-100 text-yellow-800' :
-              stage === 'listas' ? 'bg-purple-100 text-purple-800' :
-              stage === 'pre_evento' ? 'bg-orange-100 text-orange-800' :
-              stage === 'diaD' ? 'bg-red-100 text-red-800' :
+              stage === 'termos_confirmacao' ? 'bg-green-100 text-green-800' :
+              stage === 'mapeamento_carreira' ? 'bg-purple-100 text-purple-800' :
+              stage === 'finalizacao' ? 'bg-emerald-100 text-emerald-800' :
               'bg-green-100 text-green-800'
             }`}>
               {stageLabels[stage] || stage}
@@ -432,13 +427,9 @@ export const Conversations: React.FC = () => {
                 <option value="">Todos os estágios</option>
                 <option value="not_started">Não iniciado</option>
                 <option value="intro">Introdução</option>
-                <option value="asa">ASA</option>
-                <option value="listas">Listas</option>
-                <option value="pre_evento">Pré-evento</option>
-                <option value="diaD">Dia D</option>
-                <option value="pos_24h">Pós 24h</option>
-                <option value="pos_7d">Pós 7 dias</option>
-                <option value="pos_30d">Pós 30 dias</option>
+                <option value="termos_confirmacao">Termos & Confirmação</option>
+                <option value="mapeamento_carreira">Mapeamento de Carreira</option>
+                <option value="finalizacao">Finalização</option>
               </select>
             </div>
 

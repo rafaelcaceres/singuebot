@@ -201,7 +201,7 @@ export const getInterviewAnalytics = query({
     }, {} as Record<string, number>);
 
     // Completion funnel
-    const stages = ["intro", "pre_7d", "pre_24h", "diaD", "pos_24h", "pos_7d", "pos_30d"];
+    const stages = ["intro", "termos_confirmacao", "mapeamento_carreira", "finalizacao"];
     const funnel = stages.map(stage => ({
       stage,
       count: stageDistribution[stage] || 0,
@@ -211,7 +211,7 @@ export const getInterviewAnalytics = query({
     }));
 
     // Completion rate
-    const completedSessions = sessions.filter(s => s.step === "pos_30d").length;
+    const completedSessions = sessions.filter(s => s.step === "finalizacao").length;
     const completionRate = sessions.length > 0 
       ? Math.round((completedSessions / sessions.length) * 100)
       : 0;

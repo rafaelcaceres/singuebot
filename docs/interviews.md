@@ -1,4 +1,4 @@
-﻿ROTEIRO DO DIÁLOGO - SINFLOW - FUTURE IN BLACK
+ROTEIRO DO DIÁLOGO - SINFLOW - FUTURE IN BLACK
 1 - APRESENTAÇÃO: (até 15/09)
 Olá, XXX Fellow do FUTURE IN BLACK
 
@@ -54,22 +54,22 @@ ________________
 3 - DISTRIBUIÇÃO DE CONTEÚDO (Até 05/10):
 Olá, XXX Fellow do FUTURE IN BLACK
 Estamos a 10 dias do evento e viemos compartilhar importantes pontos para que você aproveite ao máximo o maior evento de ….
-* Aqui entram as reflexões sobre carreira a ser customizado a parte das respostas e com base na Metodologia ASA da Singuê.
-1) Ancestralidade — “mapa de força” (10 min)
+* Aqui entram as reflexões sobre carreira a ser customizado a parte das respostas e com base na Metodologia de Carreira da Singuê.
+1) Momento de Carreira — "mapa de força" (10 min)
 * Quem te formou como profissional? 3 nomes, 3 lições.
 
 * O que da sua história vira diferencial no negócio de hoje?
 
-* Qual decisão recente você tomou usando “astúcia social” (ler o jogo)?
+* Qual decisão recente você tomou usando "astúcia social" (ler o jogo)?
 
-2) Sabedoria Presente — “inventário de potência” (15 min)
+2) Expectativas do Future in Black — "inventário de potência" (15 min)
    * Liste 5 situações em que você entregou acima da média e por quê (talentos, não tarefas).
 
    * Triggers: o que te drena / o que te energiza no trabalho?
 
-   * Escreva um pitch de valor de 30–45s: “Eu ajudo [tipo de negócio] a [resultado mensurável] fazendo [como você entrega]”.
+   * Escreva um pitch de valor de 30–45s: "Eu ajudo [tipo de negócio] a [resultado mensurável] fazendo [como você entrega]".
 
-3) Ascensão — “tese de crescimento 12 meses” (15 min)
+3) Valor Desejado — "tese de crescimento 12 meses" (15 min)
       * Objetivo 1 (impacto no negócio), Objetivo 2 (capital político), Objetivo 3 (bem-estar).
 
       * Qual espaço você quer ocupar (projeto/foro/comitê) e qual pedido fará para chegar lá?

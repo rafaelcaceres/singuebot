@@ -1,10 +1,10 @@
-# 🎭 Fluxo de Entrevista - 8 Etapas
+# 🎭 Fluxo de Entrevista - 4 Etapas
 
 ## Visão Geral
 
-O sistema implementa um fluxo de entrevista estruturado em 8 etapas, guiando o usuário através de uma jornada de autoconhecimento focada em **Ancestralidade**, **Sabedoria** e **Ascensão** (ASA).
+O sistema implementa um fluxo de entrevista estruturado em 4 etapas, guiando o usuário através de uma jornada de desenvolvimento profissional focada em **Mapeamento de Carreira**.
 
-**Duração Estimada**: 45-90 minutos por usuário
+**Duração Estimada**: 30-45 minutos por usuário
 **Progressão**: Linear com possibilidade de revisitar etapas anteriores
 
 ---
@@ -13,22 +13,14 @@ O sistema implementa um fluxo de entrevista estruturado em 8 etapas, guiando o u
 
 ```mermaid
 graph TD
-    A[intro] --> B[ASA]
-    B --> C[sabedoria]
-    C --> D[ancestralidade]
-    D --> E[ascensao]
-    E --> F[integracao]
-    F --> G[compromisso]
-    G --> H[completed]
+    A[intro] --> B[termos_confirmacao]
+    B --> C[mapeamento_carreira]
+    C --> D[finalizacao]
     
     style A fill:#e1f5fe
     style B fill:#f3e5f5
     style C fill:#e8f5e8
     style D fill:#fff3e0
-    style E fill:#fce4ec
-    style F fill:#f1f8e9
-    style G fill:#e0f2f1
-    style H fill:#e8eaf6
 ```
 
 ---
@@ -46,7 +38,7 @@ interface IntroStage {
   keyActions: [
     "Apresentação do bot e propósito",
     "Solicitação de consentimento para coleta de dados",
-    "Explicação da jornada ASA",
+    "Explicação da jornada de carreira",
     "Confirmação de participação voluntária"
   ]
 }
@@ -54,11 +46,11 @@ interface IntroStage {
 
 #### Exemplo de Interação
 ```
-🤖 Bot: "Olá! Sou seu guia nesta jornada de autoconhecimento. Para começarmos, preciso do seu consentimento para coletar e processar seus dados durante nossa conversa. Você concorda?"
+🤖 Bot: "Olá! Sou seu guia nesta jornada de desenvolvimento profissional. Para começarmos, preciso do seu consentimento para coletar e processar seus dados durante nossa conversa. Você concorda?"
 
 👤 Usuário: "Sim, concordo"
 
-🤖 Bot: "Perfeito! Vamos explorar juntos sua jornada de Ancestralidade, Sabedoria e Ascensão. Esta é uma experiência transformadora que pode durar entre 45-90 minutos. Está pronto para começar?"
+🤖 Bot: "Perfeito! Vamos explorar juntos seu mapeamento de carreira. Esta é uma experiência transformadora que pode durar entre 30-45 minutos. Está pronto para começar?"
 ```
 
 #### Critérios de Progressão
@@ -78,163 +70,115 @@ interface IntroData {
 
 ---
 
-### 2️⃣ Etapa: `ASA`
-**Objetivo**: Introduzir os três pilares da jornada
+### 2️⃣ Etapa: `termos_confirmacao`
+**Objetivo**: Confirmar termos de uso e privacidade
 
 #### Fluxo da Conversa
 ```typescript
-interface ASAStage {
-  purpose: "Apresentar Ancestralidade, Sabedoria e Ascensão",
-  duration: "5-8 minutos",
+interface TermosStage {
+  purpose: "Confirmação de termos de uso e privacidade",
+  duration: "2-3 minutos",
   keyActions: [
-    "Explicar o conceito de Ancestralidade",
-    "Definir Sabedoria no contexto pessoal",
-    "Apresentar Ascensão como crescimento",
-    "Identificar qual pilar ressoa mais"
+    "Apresentar termos de uso",
+    "Explicar política de privacidade",
+    "Confirmar aceite dos termos",
+    "Validar entendimento sobre uso dos dados"
   ]
 }
 ```
 
-#### Conceitos Explorados
-```typescript
-interface ASAConcepts {
-  ancestralidade: {
-    definition: "Conexão com suas raízes, família e tradições",
-    questions: [
-      "Que histórias familiares te marcaram?",
-      "Quais tradições você valoriza?",
-      "Como seu passado influencia quem você é hoje?"
-    ]
-  },
-  sabedoria: {
-    definition: "Conhecimento aplicado com discernimento",
-    questions: [
-      "Que lições importantes você aprendeu?",
-      "Como você toma decisões difíceis?",
-      "Qual conhecimento você gostaria de compartilhar?"
-    ]
-  },
-  ascensao: {
-    definition: "Crescimento pessoal e evolução contínua",
-    questions: [
-      "Onde você se vê daqui a 5 anos?",
-      "Que aspectos de si mesmo quer desenvolver?",
-      "Como você define sucesso pessoal?"
-    ]
-  }
-}
-```
-
-#### Critérios de Progressão
-- ✅ Usuário demonstra compreensão dos três pilares
-- ✅ Identifica qual pilar mais ressoa
-- ✅ Expressa interesse em explorar mais profundamente
-
 ---
 
-### 3️⃣ Etapa: `sabedoria`
-**Objetivo**: Explorar conhecimentos e aprendizados pessoais
+### 3️⃣ Etapa: `mapeamento_carreira`
+**Objetivo**: Explorar trajetória profissional e objetivos de carreira
 
 #### Fluxo da Conversa
 ```typescript
-interface SabedoriaStage {
-  purpose: "Mapear conhecimentos, experiências e insights pessoais",
-  duration: "10-15 minutos",
+interface MapeamentoCarreiraStage {
+  purpose: "Mapear trajetória profissional, competências e objetivos",
+  duration: "20-30 minutos",
   keyActions: [
-    "Identificar experiências formativas",
-    "Explorar lições aprendidas",
-    "Descobrir padrões de tomada de decisão",
-    "Reconhecer sabedoria única do usuário"
+    "Identificar momento atual da carreira",
+    "Explorar expectativas do Future in Black",
+    "Descobrir valor desejado e objetivos",
+    "Reconhecer competências e diferenciais únicos"
   ]
 }
 ```
 
 #### Áreas de Exploração
 ```typescript
-interface SabedoriaAreas {
-  experienciasFormativas: {
-    prompt: "Conte-me sobre uma experiência que mudou sua perspectiva de vida",
+interface CarreiraAreas {
+  momentoCarreira: {
+    prompt: "Onde você sente que está agora na sua jornada profissional?",
     followUp: [
-      "O que exatamente mudou em você?",
-      "Como isso influencia suas decisões hoje?",
-      "Que conselho você daria para alguém passando por algo similar?"
+      "O que te trouxe até aqui?",
+      "Quais foram os marcos mais importantes?",
+      "Como você avalia seu crescimento atual?"
     ]
   },
-  tomadaDecisao: {
-    prompt: "Como você costuma tomar decisões importantes?",
+  expectativasFutureInBlack: {
+    prompt: "O que você espera que esse evento possa te provocar ou desbloquear?",
     followUp: [
-      "Você confia mais na razão ou na intuição?",
-      "Que fatores são mais importantes para você?",
-      "Já tomou alguma decisão que parecia errada mas se mostrou certa?"
+      "Que tipo de inspiração você busca?",
+      "Quais conexões seriam valiosas?",
+      "Que insights poderiam transformar sua carreira?"
     ]
   },
-  conhecimentoUnico: {
-    prompt: "Que conhecimento ou habilidade você tem que poucos possuem?",
+  valorDesejado: {
+    prompt: "Se você pudesse sair desse encontro com apenas uma coisa valiosa, o que seria?",
     followUp: [
-      "Como você desenvolveu isso?",
-      "De que forma isso te diferencia?",
-      "Como você usa isso para ajudar outros?"
+      "Como isso impactaria sua trajetória?",
+      "Que mudanças concretas isso geraria?",
+      "Como você aplicaria isso no seu dia a dia?"
     ]
   }
 }
 ```
 
-#### Dados Coletados
-```typescript
-interface SabedoriaData {
-  experienciasChave: string[],
-  licoesAprendidas: string[],
-  estiloDecisao: 'intuitivo' | 'racional' | 'misto',
-  conhecimentosUnicos: string[],
-  valoresCore: string[],
-  mentores: string[]
-}
-```
-
 ---
 
-### 4️⃣ Etapa: `ancestralidade`
-**Objetivo**: Conectar com raízes, família e tradições
-
+### 4️⃣ Etapa: `finalizacao`
+**Objetivo**: Consolidar insights e definir próximos passos
 #### Fluxo da Conversa
 ```typescript
-interface AncestralIdadeStage {
-  purpose: "Explorar conexões familiares, culturais e históricas",
-  duration: "10-15 minutos",
+interface FinalizacaoStage {
+  purpose: "Consolidar insights e definir próximos passos",
+  duration: "5-10 minutos",
   keyActions: [
-    "Mapear influências familiares",
-    "Identificar tradições importantes",
-    "Explorar herança cultural",
-    "Reconhecer padrões geracionais"
+    "Resumir principais insights da jornada",
+    "Identificar ações concretas pós-evento",
+    "Definir metas de networking",
+    "Estabelecer plano de acompanhamento"
   ]
 }
 ```
 
-#### Áreas de Exploração
+#### Áreas de Consolidação
 ```typescript
-interface AncestralIdadeAreas {
-  influenciasFamiliares: {
-    prompt: "Que pessoa da sua família mais te influenciou e por quê?",
+interface FinalizacaoAreas {
+  insightsChave: {
+    prompt: "Qual foi o principal insight sobre sua carreira durante nossa conversa?",
     followUp: [
-      "Que características dessa pessoa você vê em si?",
-      "Que lições ela te ensinou?",
-      "Como você honra essa influência hoje?"
+      "Como isso muda sua perspectiva?",
+      "Que ações concretas isso sugere?",
+      "Como você vai aplicar isso no Future in Black?"
     ]
   },
-  tradicoesCulturais: {
-    prompt: "Que tradições familiares ou culturais são importantes para você?",
+  proximosPassos: {
+    prompt: "Quais são seus próximos passos após o evento?",
     followUp: [
-      "Como essas tradições moldam sua identidade?",
-      "Quais você pretende passar adiante?",
-      "Alguma tradição você escolheu não seguir? Por quê?"
+      "Que conexões você quer fazer?",
+      "Que oportunidades você vai buscar?",
+      "Como você vai manter o momentum?"
     ]
   },
-  historiasOrigens: {
-    prompt: "Que história sobre suas origens mais te marca?",
+  compromissos: {
+    prompt: "Que compromisso você faz consigo mesmo para os próximos 30 dias?",
     followUp: [
-      "Como essa história te conecta com seu passado?",
-      "Que valores ela representa?",
-      "Como ela influencia suas escolhas atuais?"
+      "Como você vai medir o progresso?",
+      "Que suporte você precisa?",
+      "Quando você vai revisar seus objetivos?"
     ]
   }
 }
@@ -242,231 +186,168 @@ interface AncestralIdadeAreas {
 
 #### Dados Coletados
 ```typescript
-interface AncestralIdadeData {
-  influenciasPrincipais: {
-    pessoa: string,
-    relacao: string,
-    influencia: string
-  }[],
-  tradicoesValoradas: string[],
-  herancaCultural: string[],
-  historiasOrigens: string[],
-  padroesGeracionais: string[]
+interface FinalizacaoData {
+  insightsPrincipais: string[],
+  acoesPlanejadas: string[],
+  metasNetworking: string[],
+  compromissos30Dias: string[],
+  suporteNecessario: string[],
+  proximaRevisao: Date
 }
 ```
 
 ---
 
-### 5️⃣ Etapa: `ascensao`
-**Objetivo**: Explorar crescimento pessoal e aspirações futuras
+## 🔄 Transições Entre Etapas
 
-#### Fluxo da Conversa
-```typescript
-interface AscensaoStage {
-  purpose: "Mapear objetivos, sonhos e potencial de crescimento",
-  duration: "10-15 minutos",
-  keyActions: [
-    "Identificar aspirações pessoais",
-    "Explorar definição pessoal de sucesso",
-    "Mapear áreas de crescimento desejado",
-    "Visualizar futuro ideal"
-  ]
-}
-```
+### Critérios de Progressão
+Cada etapa possui critérios específicos que devem ser atendidos antes da transição:
 
-#### Áreas de Exploração
+#### `intro` → `termos_confirmacao`
+- ✅ Consentimento LGPD coletado
+- ✅ Usuário demonstra compreensão do processo
+- ✅ Disponibilidade confirmada
+
+#### `termos_confirmacao` → `mapeamento_carreira`
+- ✅ Termos de uso aceitos
+- ✅ Política de privacidade compreendida
+- ✅ Confirmação de participação voluntária
+
+#### `mapeamento_carreira` → `finalizacao`
+- ✅ Momento de carreira mapeado
+- ✅ Expectativas do evento clarificadas
+- ✅ Valor desejado identificado
+- ✅ Competências e diferenciais reconhecidos
+
+### Mecanismo de Validação
 ```typescript
-interface AscensaoAreas {
-  visaoFuturo: {
-    prompt: "Como você se vê daqui a 5 anos?",
-    followUp: [
-      "O que precisa acontecer para chegar lá?",
-      "Que obstáculos você antecipa?",
-      "Como você vai saber que chegou onde queria?"
-    ]
-  },
-  definicaoSucesso: {
-    prompt: "Como você define sucesso na sua vida?",
-    followUp: [
-      "Isso mudou ao longo do tempo?",
-      "Que papel os outros têm no seu sucesso?",
-      "Sucesso para você é mais interno ou externo?"
-    ]
-  },
-  crescimentoPessoal: {
-    prompt: "Que aspecto de si mesmo você mais quer desenvolver?",
-    followUp: [
-      "Por que essa área é importante para você?",
-      "Que passos já está tomando nessa direção?",
-      "Como vai medir seu progresso?"
-    ]
+interface StageValidation {
+  validateTransition(
+    currentStage: InterviewStage,
+    nextStage: InterviewStage,
+    userData: UserData
+  ): {
+    canProgress: boolean,
+    missingCriteria: string[],
+    recommendations: string[]
   }
 }
 ```
 
-#### Dados Coletados
+---
+
+## 📊 Análise e Processamento
+
+### Coleta de Dados
+Durante cada etapa, o sistema coleta dados estruturados que alimentam:
+
+#### 1. **Perfil de Carreira**
 ```typescript
-interface AscensaoData {
-  visaoFuturo: string,
-  definicaoSucesso: string,
-  areasDesenvolvimento: string[],
-  objetivosPrincipais: string[],
-  motivacoesProfundas: string[],
-  medidasProgresso: string[]
+interface CareerProfile {
+  momentoAtual: string,
+  expectativasEvento: string[],
+  valorDesejado: string,
+  competenciasChave: string[],
+  objetivosCarreira: string[],
+  redesNetworking: string[]
+}
+```
+
+#### 2. **Insights Personalizados**
+- Análise de padrões nas respostas
+- Identificação de temas recorrentes
+- Sugestões de conexões relevantes
+- Recomendações de conteúdo do evento
+
+#### 3. **Métricas de Engajamento**
+```typescript
+interface EngagementMetrics {
+  tempoTotalSessao: number,
+  profundidadeRespostas: 'superficial' | 'moderada' | 'profunda',
+  temasPrincipais: string[],
+  nivelReflexao: number,
+  pontuacaoCompletude: number
 }
 ```
 
 ---
 
-### 6️⃣ Etapa: `integracao`
-**Objetivo**: Conectar os três pilares em uma visão coesa
+## 🎯 Personalização e Recomendações
 
-#### Fluxo da Conversa
-```typescript
-interface IntegracaoStage {
-  purpose: "Sintetizar insights dos três pilares em uma narrativa coesa",
-  duration: "8-12 minutos",
-  keyActions: [
-    "Identificar conexões entre os pilares",
-    "Sintetizar insights principais",
-    "Criar narrativa pessoal integrada",
-    "Reconhecer padrões e temas recorrentes"
-  ]
-}
-```
+### Sistema de Recomendações
+Com base nos dados coletados, o sistema gera:
 
-#### Processo de Integração
-```typescript
-interface IntegracaoProcess {
-  sintese: {
-    prompt: "Olhando para tudo que conversamos, que padrões você vê?",
-    analysis: [
-      "Como sua ancestralidade influencia sua sabedoria?",
-      "De que forma sua sabedoria guia sua ascensão?",
-      "Como sua visão de futuro honra suas raízes?"
-    ]
-  },
-  narrativaPessoal: {
-    prompt: "Se você fosse contar sua história em poucas palavras, como seria?",
-    elements: [
-      "Tema central da sua jornada",
-      "Valores que te guiam",
-      "Missão ou propósito pessoal"
-    ]
-  },
-  reconhecimentoPadrao: {
-    prompt: "Que tema ou valor aparece em todas as áreas da sua vida?",
-    insights: [
-      "Forças recorrentes",
-      "Desafios consistentes",
-      "Oportunidades de crescimento"
-    ]
-  }
-}
-```
+#### **Conteúdo Personalizado**
+- Sessões do evento mais relevantes
+- Palestrantes alinhados com interesses
+- Workshops recomendados
+- Materiais de leitura sugeridos
 
-#### Dados Coletados
-```typescript
-interface IntegracaoData {
-  padroesPrincipais: string[],
-  narrativaPessoal: string,
-  temasCentrales: string[],
-  conexoesPilares: {
-    ancestralidadeSabedoria: string,
-    sabedoriaAscensao: string,
-    ascensaoAncestralidade: string
-  },
-  insightsPrincipais: string[]
-}
-```
+#### **Networking Direcionado**
+- Perfis de participantes similares
+- Conexões estratégicas sugeridas
+- Grupos de interesse comum
+- Mentores potenciais
+
+#### **Plano de Ação Pós-Evento**
+- Próximos passos específicos
+- Recursos para desenvolvimento
+- Cronograma de acompanhamento
+- Métricas de progresso
 
 ---
 
-### 7️⃣ Etapa: `compromisso`
-**Objetivo**: Estabelecer compromissos concretos para o futuro
+## 🔧 Implementação Técnica
 
-#### Fluxo da Conversa
+### Estados da Entrevista
 ```typescript
-interface CompromissoStage {
-  purpose: "Transformar insights em ações concretas e compromissos",
-  duration: "8-12 minutos",
-  keyActions: [
-    "Definir ações específicas",
-    "Estabelecer prazos realistas",
-    "Identificar recursos necessários",
-    "Criar sistema de acompanhamento"
-  ]
+type InterviewStage = 
+  | 'intro'
+  | 'termos_confirmacao' 
+  | 'mapeamento_carreira'
+  | 'finalizacao'
+  | 'completed';
+
+interface InterviewState {
+  currentStage: InterviewStage,
+  completedStages: InterviewStage[],
+  userData: Record<string, any>,
+  startTime: Date,
+  lastActivity: Date,
+  progressPercentage: number
 }
 ```
 
-#### Estrutura de Compromissos
+### Validação de Progressão
 ```typescript
-interface CompromissoStructure {
-  acoesCurto: {
-    prazo: "30 dias",
-    prompt: "O que você vai fazer nos próximos 30 dias baseado em nossa conversa?",
-    criteria: [
-      "Específico e mensurável",
-      "Conectado aos insights da entrevista",
-      "Realista e alcançável"
-    ]
-  },
-  acoesMedio: {
-    prazo: "6 meses",
-    prompt: "Que mudança maior você quer ver em 6 meses?",
-    criteria: [
-      "Alinhado com visão de futuro",
-      "Baseado nos pilares ASA",
-      "Desafiador mas possível"
-    ]
-  },
-  sistemaSuporte: {
-    prompt: "Que apoio você precisa para cumprir esses compromissos?",
-    elements: [
-      "Pessoas que podem ajudar",
-      "Recursos necessários",
-      "Obstáculos a superar"
-    ]
-  }
+interface StageValidator {
+  canProgress(stage: InterviewStage, data: any): boolean;
+  getRequiredFields(stage: InterviewStage): string[];
+  validateData(stage: InterviewStage, data: any): ValidationResult;
 }
 ```
 
-#### Dados Coletados
-```typescript
-interface CompromissoData {
-  acoesCurtoPrazo: {
-    acao: string,
-    prazo: Date,
-    medida: string
-  }[],
-  acoesMedioPrazo: {
-    objetivo: string,
-    prazo: Date,
-    marcos: string[]
-  }[],
-  sistemaSuporte: {
-    pessoas: string[],
-    recursos: string[],
-    obstaculos: string[]
-  },
-  compromissoPublico?: string
-}
-```
+### Persistência de Dados
+- Dados salvos automaticamente a cada resposta
+- Backup em tempo real no Convex
+- Recuperação de sessão em caso de desconexão
+- Histórico completo para análise posterior
 
 ---
 
-### 8️⃣ Etapa: `completed`
-**Objetivo**: Finalizar a jornada e fornecer recursos para continuidade
+## 📈 Métricas e Analytics
 
-#### Fluxo da Conversa
-```typescript
-interface CompletedStage {
-  purpose: "Celebrar a jornada e fornecer recursos para continuidade",
-  duration: "5-8 minutos",
-  keyActions: [
-    "Celebrar a conclusão da jornada",
-    "Resumir principais insights",
-    "Fornecer recursos para continuidade",
+### KPIs Principais
+- **Taxa de Conclusão**: % de usuários que completam todas as etapas
+- **Tempo Médio por Etapa**: Duração típica de cada fase
+- **Profundidade de Engajamento**: Qualidade das respostas
+- **Pontos de Abandono**: Onde usuários mais desistem
+
+### Relatórios Gerados
+- Dashboard de progresso individual
+- Análise de padrões de carreira
+- Recomendações personalizadas
+- Insights para melhoria do evento
     "Estabelecer possibilidade de follow-up"
   ]
 }

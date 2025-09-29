@@ -2,6 +2,16 @@
 
 ## [Unreleased] - 2025-01-14
 
+### 🔄 RECENT CHANGES
+
+#### Interview Flow Restructure
+- ✅ **BREAKING**: Simplified interview flow from 8 stages to 4 career-focused stages
+- ✅ New flow: `intro → termos_confirmacao → mapeamento_carreira → finalizacao`
+- ✅ Replaced ASA methodology with career development focus
+- ✅ Updated all documentation to reflect new interview stages
+- ✅ Modified admin dashboard filters for new stage names
+- ✅ Maintained RAG system with updated tagging (removed ASA references)
+
 ### ✅ COMPLETED (5 Phases)
 
 #### Phase 1: Infrastructure Setup
@@ -25,13 +35,13 @@
 - ✅ Document ingestion with chunking (500-800 tokens, 100 overlap)
 - ✅ OpenAI text-embedding-3-large integration
 - ✅ Vector similarity search with top-k retrieval
-- ✅ Tag-based filtering (ASA, tema, nivel)
+- ✅ Tag-based filtering (tema, nivel - ASA references removed)
 - ✅ Response fusion with context + session state
 - ✅ Frontend RAG utilities in `src/lib/rag.ts`
 
 #### Phase 4: Interview State Machine
-- ✅ Created `convex/functions/interview.ts` with 8-stage flow
-- ✅ Stage progression: `intro → ASA → listas → pre_evento → diaD → pos_24h → pos_7d → pos_30d`
+- ✅ Created `convex/functions/interview.ts` with career-focused flow
+- ✅ Stage progression: `intro → termos_confirmacao → mapeamento_carreira → finalizacao`
 - ✅ RAG integration for context-aware responses
 - ✅ Session state management with LGPD compliance
 - ✅ Consent handling and opt-out support

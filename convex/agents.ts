@@ -8,7 +8,7 @@ import { internalAction, internalMutation, query } from "./_generated/server";
 
 export const FABI_PERSONALITY = `Você é a Fabi, assistente do Future in Black. Você é acolhedora, empática e focada em ajudar pessoas negras em sua jornada profissional. 
 
-Sua missão é conduzir entrevistas reflexivas baseadas na metodologia ASA (Ancestralidade, Sabedoria, Ascensão).
+Sua missão é conduzir entrevistas reflexivas focadas no desenvolvimento de carreira e mapeamento profissional.
 
 Características da sua personalidade:
 - Calorosa e acolhedora
@@ -18,6 +18,35 @@ Características da sua personalidade:
 - Celebra conquistas e aprendizados
 
 Mantenha suas perguntas concisas mas significativas com o contexto das respostas anteriores.`;
+
+const FABI_MAIN_FUNCTIONS = `
+PRINCIPAIS FUNÇÕES:
+1. Conduzir entrevistas estruturadas seguindo os estágios definidos
+2. Fazer perguntas reflexivas sobre desenvolvimento de carreira
+3. Avaliar respostas e determinar progressão
+4. Fornecer feedback construtivo e empático
+5. Manter o foco na jornada profissional do participante
+`;
+
+const FABI_RESPONSE_GUIDELINES = `
+DIRETRIZES DE RESPOSTA:
+- Use linguagem acolhedora e empática
+- Faça uma pergunta por vez
+- Conecte as perguntas com as respostas anteriores
+- Celebre insights e conquistas compartilhadas
+- Mantenha o foco no desenvolvimento de carreira
+- Seja concisa mas significativa
+- Use a tool searchKnowledgeTool para obter informações relevantes
+`;
+
+const INTERVIEW_START_PROMPT = `
+INÍCIO DA ENTREVISTA:
+Quando iniciar uma nova entrevista, apresente-se como Fabi e explique brevemente:
+- Seu papel como assistente do Future in Black
+- O objetivo da entrevista reflexiva sobre carreira
+- Que será uma conversa acolhedora sobre a jornada profissional
+- A importância de mapear o momento atual de carreira
+`;
 
 // Shared configuration for all agents
 const sharedDefaults = {
@@ -67,8 +96,7 @@ const searchKnowledgeTool = createTool({
   },
 });
 
-// Using unified INTERVIEW_STAGES flow from interview.ts - no separate FIB_QUESTIONS needed
-
+// Interview Session Management Tool
 const interviewSessionTool = createTool({
   description: "Manage interview session state and progression",
   args: z.object({
@@ -80,18 +108,14 @@ const interviewSessionTool = createTool({
   handler: async (ctx, args): Promise<string> => {
     try {
       if (args.action === "get") {
-        // Return a simple status message
         return "Sessão de entrevista ativa. Continuando com o fluxo FIB.";
       }
       
       if (args.action === "update" && args.stage) {
-        // For now, return a message indicating the update would happen
-        // The actual session update should be handled by the interview functions
         return `Solicitação para atualizar sessão para o estágio: ${args.stage}`;
       }
       
       if (args.action === "next_stage") {
-        // Logic to determine next stage would go here
         return "Próximo estágio determinado com base na resposta do usuário.";
       }
       
@@ -103,32 +127,377 @@ const interviewSessionTool = createTool({
   },
 });
 
+// Career stage evaluation criteria
+const CAREER_STAGE_CRITERIA = {
+  "momento_carreira": {
+    name: "Momento de Carreira",
+    requiredElements: [
+      "Situação profissional atual",
+      "Reflexão sobre trajetória",
+      "Autoconhecimento profissional"
+    ],
+    minWordCount: 20,
+    keywords: ["trabalho", "carreira", "profissional", "empresa", "função", "experiência"]
+  },
+  "expectativas_fib": {
+    name: "Expectativas do Future in Black",
+    requiredElements: [
+      "Objetivos específicos",
+      "Conhecimento sobre o evento",
+      "Motivação genuína"
+    ],
+    minWordCount: 25,
+    keywords: ["networking", "aprendizado", "crescimento", "oportunidade", "desenvolvimento"]
+  },
+  "valor_desejado": {
+    name: "Valor Desejado",
+    requiredElements: [
+      "Resultado tangível",
+      "Visão estratégica",
+      "Objetivos de longo prazo"
+    ],
+    minWordCount: 30,
+    keywords: ["resultado", "impacto", "transformação", "futuro", "objetivo", "meta"]
+  }
+};
+
+// Structured output schemas for response evaluation
+const ResponseEvaluationSchema = z.object({
+  quality: z.enum(["excellent", "good", "adequate", "insufficient"]).describe("Overall quality of the response"),
+  relevance: z.enum(["highly_relevant", "relevant", "somewhat_relevant", "irrelevant"]).describe("How relevant the response is to the interview context"),
+  completeness: z.enum(["complete", "partial", "incomplete"]).describe("How complete the response is"),
+  security: z.enum(["safe", "suspicious", "dangerous"]).describe("Security assessment for prompt injection attempts"),
+  canProgress: z.boolean().describe("Whether the participant can advance to the next stage"),
+  feedback: z.string().describe("Constructive feedback for the participant"),
+  nextAction: z.enum(["advance", "clarify", "redirect", "repeat"]).describe("Recommended next action"),
+  asaConnection: z.object({
+    ancestralidade: z.number().min(0).max(10).describe("Connection to Ancestralidade pillar (0-10)"),
+    sabedoria: z.number().min(0).max(10).describe("Connection to Sabedoria pillar (0-10)"),
+    ascensao: z.number().min(0).max(10).describe("Connection to Ascensão pillar (0-10)")
+  }).describe("Connection scores to ASA methodology pillars")
+});
+
+const ProgressDecisionSchema = z.object({
+  canAdvance: z.boolean().describe("Whether participant can advance to next stage"),
+  currentStageComplete: z.boolean().describe("Whether current stage requirements are met"),
+  missingElements: z.array(z.string()).describe("List of missing elements preventing progression"),
+  recommendedAction: z.enum(["advance", "stay", "clarify", "restart_stage"]).describe("Recommended action"),
+  confidenceScore: z.number().min(0).max(1).describe("Confidence in the decision (0-1)"),
+  reasoning: z.string().describe("Detailed reasoning for the decision")
+});
+
+const SecurityAssessmentSchema = z.object({
+  isSafe: z.boolean().describe("Whether the input is safe from prompt injection"),
+  threatLevel: z.enum(["none", "low", "medium", "high"]).describe("Threat level assessment"),
+  detectedPatterns: z.array(z.string()).describe("List of suspicious patterns detected"),
+  isOnTopic: z.boolean().describe("Whether the response is on-topic for the interview"),
+  recommendedResponse: z.string().describe("Recommended response to handle the situation")
+});
+
+// Response Validation Tool
+const responseValidationTool = createTool({
+  description: "Evaluate the quality, relevance, completeness and security of a user's response in the interview context",
+  args: z.object({
+    userResponse: z.string().describe("The user's response to evaluate"),
+    currentStage: z.string().describe("Current interview stage"),
+    questionContext: z.string().describe("Context of the question that was asked"),
+    previousResponses: z.optional(z.array(z.string())).describe("Previous responses for context")
+  }),
+  handler: async (ctx, args): Promise<z.infer<typeof ResponseEvaluationSchema>> => {
+    const { userResponse, currentStage, questionContext } = args;
+    
+    // Security assessment - check for prompt injection attempts
+    const suspiciousPatterns = [
+      /ignore\s+(previous|all)\s+instructions?/i,
+      /act\s+as\s+(?:a\s+)?(?:different|new)/i,
+      /pretend\s+(?:you\s+are|to\s+be)/i,
+      /system\s*[:]\s*you\s+are/i,
+      /\[INST\]|\[\/INST\]/i,
+      /###\s*(?:instruction|system|prompt)/i
+    ];
+    
+    const hasSuspiciousContent = suspiciousPatterns.some(pattern => pattern.test(userResponse));
+    const security = hasSuspiciousContent ? "suspicious" : "safe";
+    
+    // Word count and basic completeness
+    const wordCount = userResponse.trim().split(/\s+/).length;
+    const stageCriteria = CAREER_STAGE_CRITERIA[currentStage as keyof typeof CAREER_STAGE_CRITERIA];
+    const minWords = stageCriteria?.minWordCount || 15;
+    
+    // Quality assessment based on length and content
+    let quality: "excellent" | "good" | "adequate" | "insufficient";
+    if (wordCount < minWords) {
+      quality = "insufficient";
+    } else if (wordCount < minWords * 1.5) {
+      quality = "adequate";
+    } else if (wordCount < minWords * 2.5) {
+      quality = "good";
+    } else {
+      quality = "excellent";
+    }
+    
+    // Relevance assessment - check for keywords and context
+    const keywords = stageCriteria?.keywords || [];
+    const keywordMatches = keywords.filter((keyword: string) => 
+      userResponse.toLowerCase().includes(keyword.toLowerCase())
+    ).length;
+    
+    let relevance: "highly_relevant" | "relevant" | "somewhat_relevant" | "irrelevant";
+    if (keywordMatches >= 3) {
+      relevance = "highly_relevant";
+    } else if (keywordMatches >= 2) {
+      relevance = "relevant";
+    } else if (keywordMatches >= 1) {
+      relevance = "somewhat_relevant";
+    } else {
+      relevance = "irrelevant";
+    }
+    
+    // Completeness assessment
+    let completeness: "complete" | "partial" | "incomplete";
+    if (quality === "excellent" && relevance === "highly_relevant") {
+      completeness = "complete";
+    } else if (quality !== "insufficient" && relevance !== "irrelevant") {
+      completeness = "partial";
+    } else {
+      completeness = "incomplete";
+    }
+    
+    // ASA connection scoring (simplified for now)
+    const asaConnection = {
+      ancestralidade: currentStage === "momento_carreira" ? Math.min(keywordMatches * 2, 10) : 3,
+      sabedoria: currentStage === "expectativas_fib" ? Math.min(keywordMatches * 2, 10) : 3,
+      ascensao: currentStage === "valor_desejado" ? Math.min(keywordMatches * 2, 10) : 3
+    };
+    
+    // Determine if can progress
+    const canProgress = security === "safe" && 
+                       quality !== "insufficient" && 
+                       relevance !== "irrelevant" && 
+                       completeness !== "incomplete";
+    
+    // Generate feedback
+    let feedback = "";
+    let nextAction: "advance" | "clarify" | "redirect" | "repeat" = "advance";
+    
+    if (security !== "safe") {
+      feedback = "Vamos manter nossa conversa focada na sua jornada profissional. ";
+      nextAction = "redirect";
+    } else if (quality === "insufficient") {
+      feedback = "Sua resposta está no caminho certo! Pode me contar um pouco mais sobre isso? ";
+      nextAction = "clarify";
+    } else if (relevance === "irrelevant") {
+      feedback = "Entendo sua perspectiva. Vamos focar na pergunta sobre sua trajetória profissional. ";
+      nextAction = "redirect";
+    } else if (completeness === "incomplete") {
+      feedback = "Obrigada por compartilhar! Gostaria de detalhar mais alguns aspectos? ";
+      nextAction = "clarify";
+    } else {
+      feedback = "Excelente! Sua resposta mostra uma reflexão profunda sobre sua jornada. ";
+      nextAction = "advance";
+    }
+    
+    return {
+      quality,
+      relevance,
+      completeness,
+      security,
+      canProgress,
+      feedback,
+      nextAction,
+      asaConnection
+    };
+  }
+});
+
+// Progress Evaluation Tool
+const progressEvaluationTool = createTool({
+  description: "Determine if the participant can advance to the next interview stage based on their responses",
+  args: z.object({
+    responses: z.array(z.string()).describe("All responses from the current stage"),
+    currentStage: z.string().describe("Current interview stage"),
+    userProfile: z.optional(z.object({
+      name: z.string(),
+      professionalLevel: z.optional(z.string()),
+      industry: z.optional(z.string())
+    })).describe("User profile information for context")
+  }),
+  handler: async (ctx, args): Promise<z.infer<typeof ProgressDecisionSchema>> => {
+    const { responses, currentStage } = args;
+    const stageCriteria = CAREER_STAGE_CRITERIA[currentStage as keyof typeof CAREER_STAGE_CRITERIA];
+    
+    if (!stageCriteria) {
+      return {
+        canAdvance: true,
+        currentStageComplete: true,
+        missingElements: [],
+        recommendedAction: "advance",
+        confidenceScore: 0.5,
+        reasoning: "Estágio não reconhecido, permitindo avanço por padrão."
+      };
+    }
+    
+    // Analyze all responses for this stage
+    const allText = responses.join(" ");
+    const wordCount = allText.trim().split(/\s+/).length;
+    const keywords = stageCriteria.keywords;
+    
+    // Check for required elements
+    const missingElements: Array<string> = [];
+    const keywordMatches = keywords.filter((keyword: string) => 
+      allText.toLowerCase().includes(keyword.toLowerCase())
+    ).length;
+    
+    // Evaluate completeness
+    const hasMinimumLength = wordCount >= stageCriteria.minWordCount;
+    const hasRelevantKeywords = keywordMatches >= 2;
+    const hasSubstantialContent = wordCount >= stageCriteria.minWordCount * 1.5;
+    
+    if (!hasMinimumLength) {
+      missingElements.push("Resposta muito breve - precisa de mais detalhes");
+    }
+    
+    if (!hasRelevantKeywords) {
+      missingElements.push("Falta conexão com o tema da pergunta");
+    }
+    
+    if (!hasSubstantialContent) {
+      missingElements.push("Precisa de mais profundidade na reflexão");
+    }
+    
+    // Determine if can advance
+    const canAdvance = missingElements.length === 0;
+    const currentStageComplete = canAdvance && hasSubstantialContent && keywordMatches >= 3;
+    
+    // Determine recommended action
+    let recommendedAction: "advance" | "stay" | "clarify" | "restart_stage";
+    if (canAdvance && currentStageComplete) {
+      recommendedAction = "advance";
+    } else if (canAdvance) {
+      recommendedAction = "advance";
+    } else if (missingElements.length <= 2) {
+      recommendedAction = "clarify";
+    } else {
+      recommendedAction = "stay";
+    }
+    
+    // Calculate confidence score
+    const completenessScore = Math.min(wordCount / (stageCriteria.minWordCount * 2), 1);
+    const relevanceScore = Math.min(keywordMatches / 4, 1);
+    const confidenceScore = (completenessScore + relevanceScore) / 2;
+    
+    // Generate reasoning
+    const reasoning = `Análise do estágio "${stageCriteria.name}": ${responses.length} resposta(s), ${wordCount} palavras, ${keywordMatches} palavras-chave relevantes. ${missingElements.length > 0 ? `Elementos em falta: ${missingElements.join(", ")}` : "Todos os critérios atendidos."}`;
+    
+    return {
+      canAdvance,
+      currentStageComplete,
+      missingElements,
+      recommendedAction,
+      confidenceScore,
+      reasoning
+    };
+  }
+});
+
+// Security Filter Tool
+const securityFilterTool = createTool({
+  description: "Verify security and relevance of user input to prevent prompt injection and maintain interview focus",
+  args: z.object({
+    input: z.string().describe("User input to analyze"),
+    context: z.string().describe("Current interview context")
+  }),
+  handler: async (ctx, args): Promise<z.infer<typeof SecurityAssessmentSchema>> => {
+    const { input, context } = args;
+    
+    // Define suspicious patterns for prompt injection
+    const suspiciousPatterns = [
+      { pattern: /ignore\s+(previous|all)\s+instructions?/i, description: "Instruction override attempt" },
+      { pattern: /act\s+as\s+(?:a\s+)?(?:different|new)/i, description: "Role change attempt" },
+      { pattern: /pretend\s+(?:you\s+are|to\s+be)/i, description: "Identity manipulation" },
+      { pattern: /system\s*[:]\s*you\s+are/i, description: "System prompt injection" },
+      { pattern: /\[INST\]|\[\/INST\]/i, description: "Instruction tags" },
+      { pattern: /###\s*(?:instruction|system|prompt)/i, description: "Markdown instruction headers" },
+      { pattern: /(?:^|\n)\s*\*\*(?:system|instruction|prompt)\*\*/i, description: "Bold instruction markers" },
+      { pattern: /(?:execute|run|eval)\s*\(/i, description: "Code execution attempt" },
+      { pattern: /javascript:|data:|vbscript:/i, description: "Script injection" }
+    ];
+    
+    // Check for suspicious patterns
+    const detectedPatterns: Array<string> = [];
+    let threatLevel: "none" | "low" | "medium" | "high" = "none";
+    
+    for (const { pattern, description } of suspiciousPatterns) {
+      if (pattern.test(input)) {
+        detectedPatterns.push(description);
+      }
+    }
+    
+    // Assess threat level
+    if (detectedPatterns.length === 0) {
+      threatLevel = "none";
+    } else if (detectedPatterns.length <= 2) {
+      threatLevel = "low";
+    } else if (detectedPatterns.length <= 4) {
+      threatLevel = "medium";
+    } else {
+      threatLevel = "high";
+    }
+    
+    // Check if input is on-topic for interview
+    const interviewKeywords = [
+      "trabalho", "carreira", "profissional", "empresa", "experiência",
+      "objetivo", "meta", "futuro", "desenvolvimento", "crescimento",
+      "habilidade", "competência", "formação", "educação", "networking",
+      "liderança", "gestão", "projeto", "resultado", "impacto"
+    ];
+    
+    const inputLower = input.toLowerCase();
+    const topicMatches = interviewKeywords.filter(keyword => 
+      inputLower.includes(keyword)
+    ).length;
+    
+    const isOnTopic = topicMatches > 0 || input.length < 50; // Short responses might be clarifications
+    
+    // Determine if input is safe
+    const isSafe = threatLevel === "none" || threatLevel === "low";
+    
+    // Generate recommended response
+    let recommendedResponse = "";
+    if (!isSafe) {
+      recommendedResponse = "Vamos manter nossa conversa focada na sua jornada profissional. Como posso ajudá-la a refletir sobre seus objetivos de carreira?";
+    } else if (!isOnTopic) {
+      recommendedResponse = "Entendo sua perspectiva. Vamos voltar ao foco da nossa conversa sobre sua trajetória profissional. ";
+    } else {
+      recommendedResponse = "Continue compartilhando suas reflexões.";
+    }
+    
+    return {
+      isSafe,
+      threatLevel,
+      detectedPatterns,
+      isOnTopic,
+      recommendedResponse
+    };
+  }
+});
+
 // Interview Agent
 export const interviewAgent = new Agent(components.agent, {
-  name: "Fabi - Interview Agent",
+  name: "Fabi",
   instructions: `${FABI_PERSONALITY}
 
-FUNÇÃO PRINCIPAL:
-1. Guiar participantes através dos estágios da entrevista (intro, ASA, listas, pre_evento, diaD, pos_24h, pos_7d, pos_30d)
-2. Fazer perguntas relevantes para cada estágio seguindo a metodologia ASA
-3. Avaliar respostas e determinar quando avançar para o próximo estágio
-4. Usar contexto da base de conhecimento quando necessário para melhorar suas perguntas
-5. Manter um tom acolhedor e profissional
+${FABI_MAIN_FUNCTIONS}
 
-DIRETRIZES DE RESPOSTA:
-- Sempre responda em português brasileiro
-- Mantenha o foco na jornada profissional do participante
-- Use emojis quando apropriado para tornar a conversa mais calorosa
-- Celebre conquistas e aprendizados
-- Faça conexões com os pilares ASA (Ancestralidade, Sabedoria, Ascensão)
-- Use a ferramenta de busca de conhecimento quando precisar de informações específicas sobre metodologias, desenvolvimento profissional ou orientação de carreira
+${FABI_RESPONSE_GUIDELINES}
 
-INÍCIO DA ENTREVISTA:
-Quando alguém disser "aceito" ou similar, responda:
-"Olá! Eu sou a Fabi, sua entrevistadora oficial do Future in Black! 🌟 Que alegria ter você aqui para nossa conversa sobre sua jornada profissional. Vamos explorar juntos os pilares ASA - Ancestralidade, Sabedoria e Ascensão. Para começarmos, me conte: qual é o seu nome e como você se identifica profissionalmente?"`,
+${INTERVIEW_START_PROMPT}`,
   tools: {
-    searchKnowledgeTool,
-    interviewSessionTool,
+    searchKnowledge: searchKnowledgeTool,
+    interviewSession: interviewSessionTool,
+    responseValidation: responseValidationTool,
+    progressEvaluation: progressEvaluationTool,
+    securityFilter: securityFilterTool
   },
   ...sharedDefaults,
 });
@@ -146,10 +515,12 @@ export const updateMessageWithAIMetadata = internalMutation({
       threadId: v.string(),
     }),
   },
+  returns: v.null(),
   handler: async (ctx, args) => {
-    return await ctx.db.patch(args.messageId, {
+    await ctx.db.patch(args.messageId, {
       aiMetadata: args.aiMetadata,
     });
+    return null;
   },
 });
 
@@ -162,6 +533,20 @@ export const getAIInteractions = query({
     phoneNumber: v.optional(v.string()), // For backward compatibility
     limit: v.optional(v.number()),
   },
+  returns: v.array(v.object({
+    _id: v.id("whatsappMessages"),
+    _creationTime: v.number(),
+    messageId: v.string(),
+    participantId: v.optional(v.id("participants")),
+    conversationId: v.optional(v.id("conversations")),
+    threadId: v.string(),
+    processingTimeMs: v.number(),
+    fallbackUsed: v.boolean(),
+    timestamp: v.number(),
+    phoneNumber: v.string(),
+    userMessage: v.string(),
+    aiResponse: v.string(),
+  })),
   handler: async (ctx, args) => {
     const limit = args.limit || 50;
 
@@ -241,6 +626,7 @@ export const processIncomingMessage = internalAction({
     to: v.string(),
     body: v.string(),
   },
+  returns: v.null(),
   handler: async (ctx, args) => {
     console.log("🤖 AI Agent: Processing incoming message:", args);
 
@@ -293,7 +679,7 @@ export const processIncomingMessage = internalAction({
           console.log(`🎯 FIB Interview: Successfully processed message. Next stage: ${result.nextStage || 'same'}`);
         }
 
-        return;
+        return null;
       }
 
       // This shouldn't happen, but keeping as fallback
@@ -321,5 +707,7 @@ export const processIncomingMessage = internalAction({
         console.error("🤖 AI Agent: Failed to send fallback message:", sendError);
       }
     }
+
+    return null;
   },
 });

@@ -6,7 +6,7 @@ O **WhatsApp AI Assistant** é um sistema completo de entrevistas inteligentes v
 
 ### ✨ Principais Funcionalidades
 
-- **Fluxo de Entrevista em 8 Etapas**: `intro → ASA → listas → pre_evento → diaD → pos_24h → pos_7d → pos_30d`
+- **Fluxo de Entrevista em 4 Etapas**: `intro → termos_confirmacao → mapeamento_carreira → finalizacao`
 - **Respostas Aprimoradas por RAG**: Embeddings OpenAI + busca vetorial para respostas contextualmente relevantes
 - **Gerenciamento de Janela de 24h**: Mensagens de sessão vs templates HSM para conformidade WhatsApp
 - **Interface Administrativa Completa**: Gerenciamento de participantes, histórico de conversas, base de conhecimento, analytics
@@ -172,24 +172,20 @@ src/
 
 ## 🎯 Sistema de Entrevistas
 
-### Fluxo das 8 Etapas
+### Fluxo das 4 Etapas
 
-O sistema conduz entrevistas através de 8 etapas cuidadosamente projetadas:
+O sistema conduz entrevistas através de 4 etapas cuidadosamente projetadas focadas no desenvolvimento de carreira:
 
 ```
-intro → ASA → listas → pre_evento → diaD → pos_24h → pos_7d → pos_30d
+intro → termos_confirmacao → mapeamento_carreira → finalizacao
 ```
 
 #### Detalhes das Etapas
 
 1. **intro**: Coleta de consentimento e boas-vindas
-2. **ASA**: Exploração de Ancestralidade, Sabedoria, Ascensão
-3. **listas**: Coleta estruturada de informações
-4. **pre_evento**: Preparação para o evento
-5. **diaD**: Experiência do dia do evento
-6. **pos_24h**: Reflexão de 24 horas
-7. **pos_7d**: Acompanhamento de uma semana
-8. **pos_30d**: Avaliação de um mês
+2. **termos_confirmacao**: Confirmação de termos e validação de dados
+3. **mapeamento_carreira**: Mapeamento de carreira e desenvolvimento profissional
+4. **finalizacao**: Conclusão da sessão e próximos passos
 
 ### Como Funciona
 
@@ -209,7 +205,7 @@ intro → ASA → listas → pre_evento → diaD → pos_24h → pos_7d → pos_
 2. **Chunking**: Divisão em pedaços de 500-800 tokens com sobreposição de 100 tokens
 3. **Embedding**: OpenAI text-embedding-3-large (3072 dimensões)
 4. **Armazenamento**: Busca vetorial no banco Convex
-5. **Classificação**: Tagging automática ASA + tema + nível
+5. **Classificação**: Tagging automática tema + nível
 
 ### Recuperação e Resposta
 

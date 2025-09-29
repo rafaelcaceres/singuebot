@@ -13,7 +13,6 @@ export interface KnowledgeChunk {
   chunk: string;
   embedding: number[];
   tags: {
-    asa?: string;
     tema?: string;
     nivel?: string;
   };
@@ -22,7 +21,6 @@ export interface KnowledgeChunk {
 export interface RAGQuery {
   query: string;
   filters?: {
-    asa?: string;
     tema?: string;
     nivel?: string;
   };
@@ -33,7 +31,6 @@ export interface RAGResult {
   chunk: string;
   score: number;
   tags: {
-    asa?: string;
     tema?: string;
     nivel?: string;
   };

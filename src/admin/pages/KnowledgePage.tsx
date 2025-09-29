@@ -14,8 +14,7 @@ import {
   Trash2, 
   CheckCircle, 
   AlertCircle, 
-  Clock,
-  Download
+  Clock
 } from "lucide-react";
 import { UploadDocuments } from "../components/UploadDocuments";
 import { useToast } from '@/hooks/use-toast';
@@ -25,7 +24,6 @@ interface Document {
   title: string;
   source: string;
   status: "ingested" | "pending" | "failed";
-  tags: string[];
   createdAt: number;
 }
 
@@ -35,7 +33,6 @@ export const KnowledgePage: React.FC = () => {
   
   // Queries
   const documents = useQuery(api.admin.getKnowledgeDocuments) || [];
-  const stats = useQuery(api.admin.getKnowledgeDocumentStats);
   const processingJobs = useQuery(api.admin.getProcessingJobs) || [];
   
   // Mutations
@@ -50,8 +47,9 @@ export const KnowledgePage: React.FC = () => {
         description: "O documento foi removido com sucesso.",
       });
     } catch (error) {
+      console.error("Error deleting document:", error);
       toast({
-        title: "Erro ao excluir",
+        title: "Erro ao excluir documento: " + documentId,
         description: "Não foi possível excluir o documento.",
         variant: "destructive",
       });
@@ -127,14 +125,6 @@ export const KnowledgePage: React.FC = () => {
         {labels[status]}
       </Badge>
     );
-  };
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return "0 Bytes";
-    const k = 1024;
-    const sizes = ["Bytes", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
   const formatDate = (timestamp: number) => {

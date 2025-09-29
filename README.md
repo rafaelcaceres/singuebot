@@ -6,7 +6,7 @@ A comprehensive WhatsApp AI Assistant built with **Interview Bot + RAG (Retrieva
 
 ### ✨ Key Features
 
-- **8-Stage Interview Flow**: `intro → ASA → listas → pre_evento → diaD → pos_24h → pos_7d → pos_30d`
+- **4-Stage Interview Flow**: `intro → termos_confirmacao → mapeamento_carreira → finalizacao`
 - **RAG-Enhanced Responses**: OpenAI embeddings + vector search for contextually relevant answers
 - **24h Window Management**: Session messages vs HSM templates for WhatsApp compliance
 - **Comprehensive Admin Interface**: Participant management, conversation history, knowledge base, analytics
@@ -114,29 +114,21 @@ npm run build
 
 ## 🎯 Interview Flow
 
-The system conducts interviews through 8 carefully designed stages:
+The system conducts interviews through 4 carefully designed stages focused on career development:
 
 ```mermaid
 graph LR
-    A[intro] --> B[ASA]
-    B --> C[listas]
-    C --> D[pre_evento]
-    D --> E[diaD]
-    E --> F[pos_24h]
-    F --> G[pos_7d]
-    G --> H[pos_30d]
+    A[intro] --> B[termos_confirmacao]
+    B --> C[mapeamento_carreira]
+    C --> D[finalizacao]
 ```
 
 ### Stage Details
 
 1. **intro**: Consent collection & welcome
-2. **ASA**: Ancestralidade, Sabedoria, Ascensão exploration
-3. **listas**: Structured information gathering
-4. **pre_evento**: Event preparation
-5. **diaD**: Day of event experience
-6. **pos_24h**: 24-hour reflection
-7. **pos_7d**: One week follow-up
-8. **pos_30d**: One month assessment
+2. **termos_confirmacao**: Terms confirmation & data validation
+3. **mapeamento_carreira**: Career mapping & professional development
+4. **finalizacao**: Session completion & next steps
 
 ## 🧠 RAG System
 
@@ -145,7 +137,7 @@ graph LR
 2. **Chunking**: 500-800 tokens with 100-token overlap
 3. **Embedding**: OpenAI text-embedding-3-large (3072 dimensions)  
 4. **Storage**: Vector search in Convex database
-5. **Tagging**: Automatic ASA + tema + nivel classification
+5. **Tagging**: Automatic tema + nivel classification
 
 ### Retrieval & Response
 1. **Query Embedding**: Convert user input to vector

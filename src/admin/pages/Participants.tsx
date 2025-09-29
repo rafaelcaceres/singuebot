@@ -144,24 +144,19 @@ export const Participants: React.FC = () => {
           const stageLabels: Record<string, string> = {
             not_started: 'Não iniciado',
             intro: 'Introdução',
-            asa: 'ASA',
-            listas: 'Listas',
-            pre_evento: 'Pré-evento',
-            diaD: 'Dia D',
-            pos_24h: 'Pós 24h',
-            pos_7d: 'Pós 7 dias',
-            pos_30d: 'Pós 30 dias',
+            termos_confirmacao: 'Termos & Confirmação',
+            mapeamento_carreira: 'Mapeamento de Carreira',
+            finalizacao: 'Finalização',
           };
           
           const getStageColor = (stageValue: string) => {
             switch (stageValue) {
               case 'not_started': return 'bg-gray-100 text-gray-800';
               case 'intro': return 'bg-blue-100 text-blue-800';
-              case 'asa': return 'bg-yellow-100 text-yellow-800';
-              case 'listas': return 'bg-purple-100 text-purple-800';
-              case 'pre_evento': return 'bg-orange-100 text-orange-800';
-              case 'diaD': return 'bg-red-100 text-red-800';
-              default: return 'bg-green-100 text-green-800';
+              case 'termos_confirmacao': return 'bg-green-100 text-green-800';
+              case 'mapeamento_carreira': return 'bg-purple-100 text-purple-800';
+              case 'finalizacao': return 'bg-emerald-100 text-emerald-800';
+              default: return 'bg-gray-100 text-gray-800';
             }
           };
 
@@ -424,13 +419,9 @@ export const Participants: React.FC = () => {
               <option value="">Todos os estágios</option>
               <option value="not_started">Não iniciado</option>
               <option value="intro">Introdução</option>
-              <option value="asa">ASA</option>
-              <option value="listas">Listas</option>
-              <option value="pre_evento">Pré-evento</option>
-              <option value="diaD">Dia D</option>
-              <option value="pos_24h">Pós 24h</option>
-              <option value="pos_7d">Pós 7 dias</option>
-              <option value="pos_30d">Pós 30 dias</option>
+              <option value="termos_confirmacao">Termos & Confirmação</option>
+                <option value="mapeamento_carreira">Mapeamento de Carreira</option>
+                <option value="finalizacao">Finalização</option>
             </select>
           </div>
 
