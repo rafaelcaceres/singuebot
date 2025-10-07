@@ -6,7 +6,7 @@ A comprehensive WhatsApp AI Assistant built with **Interview Bot + RAG (Retrieva
 
 ### ✨ Key Features
 
-- **4-Stage Interview Flow**: `intro → termos_confirmacao → mapeamento_carreira → finalizacao`
+- **4-Stage Interview Flow**: `intro → termos_aceite → mapeamento_carreira → finalizacao`
 - **RAG-Enhanced Responses**: OpenAI embeddings + vector search for contextually relevant answers
 - **24h Window Management**: Session messages vs HSM templates for WhatsApp compliance
 - **Comprehensive Admin Interface**: Participant management, conversation history, knowledge base, analytics
@@ -118,7 +118,7 @@ The system conducts interviews through 4 carefully designed stages focused on ca
 
 ```mermaid
 graph LR
-    A[intro] --> B[termos_confirmacao]
+    A[intro] --> B[termos_aceite]
     B --> C[mapeamento_carreira]
     C --> D[finalizacao]
 ```
@@ -126,7 +126,7 @@ graph LR
 ### Stage Details
 
 1. **intro**: Consent collection & welcome
-2. **termos_confirmacao**: Terms confirmation & data validation
+2. **termos_aceite**: Terms confirmation & data validation
 3. **mapeamento_carreira**: Career mapping & professional development
 4. **finalizacao**: Session completion & next steps
 

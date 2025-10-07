@@ -13,7 +13,7 @@ O sistema implementa um fluxo de entrevista estruturado em 4 etapas, guiando o u
 
 ```mermaid
 graph TD
-    A[intro] --> B[termos_confirmacao]
+    A[intro] --> B[termos_aceite]
     B --> C[momento_carreira]
     C --> D[expectativas_evento]
     D --> E[objetivo_principal]
@@ -74,7 +74,7 @@ interface IntroData {
 
 ---
 
-### 2️⃣ Etapa: `termos_confirmacao`
+### 2️⃣ Etapa: `termos_aceite`
 **Objetivo**: Confirmar termos de uso e privacidade
 
 #### Fluxo da Conversa
@@ -229,12 +229,12 @@ interface FinalizacaoData {
 ### Critérios de Progressão
 Cada etapa possui critérios específicos que devem ser atendidos antes da transição:
 
-#### `intro` → `termos_confirmacao`
+#### `intro` → `termos_aceite`
 - ✅ Consentimento LGPD coletado
 - ✅ Usuário demonstra compreensão do processo
 - ✅ Disponibilidade confirmada
 
-#### `termos_confirmacao` → `momento_carreira`
+#### `termos_aceite` → `momento_carreira`
 - ✅ Termos de uso aceitos
 - ✅ Política de privacidade compreendida
 - ✅ Confirmação de participação voluntária
@@ -338,7 +338,7 @@ Com base nos dados coletados, o sistema gera:
 ```typescript
 type InterviewStage = 
   | 'intro'
-  | 'termos_confirmacao' 
+  | 'termos_aceite' 
   | 'momento_carreira'
   | 'expectativas_evento'
   | 'objetivo_principal'

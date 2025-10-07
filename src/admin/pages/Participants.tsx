@@ -144,7 +144,7 @@ export const Participants: React.FC = () => {
           const stageLabels: Record<string, string> = {
             not_started: 'Não iniciado',
             intro: 'Introdução',
-            termos_confirmacao: 'Termos & Confirmação',
+            termos_aceite: 'Termos & Confirmação',
             mapeamento_carreira: 'Mapeamento de Carreira',
     momento_carreira: 'Momento de Carreira',
     expectativas_evento: 'Expectativas do Evento',
@@ -156,7 +156,7 @@ export const Participants: React.FC = () => {
             switch (stageValue) {
               case 'not_started': return 'bg-gray-100 text-gray-800';
               case 'intro': return 'bg-blue-100 text-blue-800';
-              case 'termos_confirmacao': return 'bg-green-100 text-green-800';
+              case 'termos_aceite': return 'bg-green-100 text-green-800';
               case 'mapeamento_carreira': return 'bg-purple-100 text-purple-800';
       case 'momento_carreira': return 'bg-purple-100 text-purple-800';
       case 'expectativas_evento': return 'bg-indigo-100 text-indigo-800';
@@ -425,7 +425,7 @@ export const Participants: React.FC = () => {
               <option value="">Todos os estágios</option>
               <option value="not_started">Não iniciado</option>
               <option value="intro">Introdução</option>
-              <option value="termos_confirmacao">Termos & Confirmação</option>
+              <option value="termos_aceite">Termos & Confirmação</option>
                 <option value="mapeamento_carreira">Mapeamento de Carreira</option>
                 <option value="momento_carreira">Momento de Carreira</option>
                 <option value="expectativas_evento">Expectativas do Evento</option>

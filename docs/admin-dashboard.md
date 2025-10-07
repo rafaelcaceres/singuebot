@@ -39,7 +39,7 @@ O painel administrativo é o centro de controle do WhatsApp AI Assistant. Aqui v
 #### 📊 Progressão por Etapa
 - **O que mostra**: Distribuição de usuários por etapa da entrevista
 - **Como usar**: Identifique gargalos no fluxo
-- **Etapas**: intro → termos_confirmacao → momento_carreira → expectativas_evento → objetivo_principal → finalizacao
+- **Etapas**: intro → termos_aceite → momento_carreira → expectativas_evento → objetivo_principal → finalizacao
 
 #### 🔄 Taxa de Conversão
 - **O que mostra**: Funil de conversão entre etapas
@@ -54,7 +54,7 @@ O painel administrativo é o centro de controle do WhatsApp AI Assistant. Aqui v
 #### Filtros Disponíveis
 ```typescript
 interface ParticipantFilters {
-  stage: 'intro' | 'termos_confirmacao' | 'momento_carreira' | 'expectativas_evento' | 'objetivo_principal' | 'finalizacao' | 'completed',
+  stage: 'intro' | 'termos_aceite' | 'momento_carreira' | 'expectativas_evento' | 'objetivo_principal' | 'finalizacao' | 'completed',
   dateRange: 'today' | 'week' | 'month' | 'all',
   status: 'active' | 'inactive' | 'blocked'
 }

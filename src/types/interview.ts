@@ -1,5 +1,6 @@
 export type InterviewStage = 
-  | "termos_confirmacao"
+  | "termos_aceite"
+  | "confirmacao_dados"
   | "momento_carreira"
   | "expectativas_evento"
   | "objetivo_principal"

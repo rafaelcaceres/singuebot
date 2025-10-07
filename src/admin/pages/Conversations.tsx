@@ -187,7 +187,7 @@ export const Conversations: React.FC = () => {
           const stage = info.getValue() as string;
           const stageLabels: Record<string, string> = {
             not_started: 'Não iniciado',
-            termos_confirmacao: 'Termos & Confirmação',
+            termos_aceite: 'Termos & Confirmação',
             mapeamento_carreira: 'Mapeamento de Carreira',
     momento_carreira: 'Momento de Carreira',
     expectativas_evento: 'Expectativas do Evento',
@@ -197,7 +197,7 @@ export const Conversations: React.FC = () => {
           return (
             <span className={`px-2 py-1 rounded-full text-xs font-medium ${
               stage === 'not_started' ? 'bg-gray-100 text-gray-800' :
-              stage === 'termos_confirmacao' ? 'bg-green-100 text-green-800' :
+              stage === 'termos_aceite' ? 'bg-green-100 text-green-800' :
               stage === 'mapeamento_carreira' ? 'bg-purple-100 text-purple-800' :
               stage === 'momento_carreira' ? 'bg-purple-100 text-purple-800' :
               stage === 'expectativas_evento' ? 'bg-indigo-100 text-indigo-800' :
@@ -430,7 +430,7 @@ export const Conversations: React.FC = () => {
               >
                 <option value="">Todos os estágios</option>
                 <option value="not_started">Não iniciado</option>
-                <option value="termos_confirmacao">Termos & Confirmação</option>
+                <option value="termos_aceite">Termos & Confirmação</option>
                 <option value="mapeamento_carreira">Mapeamento de Carreira</option>
                   <option value="momento_carreira">Momento de Carreira</option>
                   <option value="expectativas_evento">Expectativas do Evento</option>
