@@ -17,31 +17,38 @@ const INTERVIEW_STAGES: Record<InterviewStage, {
   prompt?: string;
   fallbackMessage?: string;
 }> = {
-  intro: {
-    name: "Apresentação & Termos de uso",
-    description: "Apresentação da Fabi e solicitação de aceite dos termos",
-    nextStage: "termos_confirmacao",
-    prompt: "Você é a Fabi, assistente de carreira do Future in Black. Apresente-se seguindo exatamente este script: 'Olá, {nome}. Eu sou a Fabi, sua assistente de carreira no Future in Black. Fui criada pela Singuê (www.singue.com.br), consultoria especialista em carreiras de pessoas negras no Brasil, em parceria com a Quilombo Flow (https://quilomboflow.org). Minha missão é ajudar você a transformar o FIB em um movimento real para sua carreira — com conexões, conteúdos e provocações sob medida. Antes de seguirmos, preciso que você leia e aceite o termo de uso. Posso te enviar agora?' Aguarde a confirmação para prosseguir.",
-    fallbackMessage: "Olá! 👋 Eu sou a Fabi, sua assistente de carreira no Future in Black. Fui criada pela Singuê em parceria com a Quilombo Flow. Preciso que você aceite nossos termos de uso antes de continuarmos. Posso te enviar? 📋",
-  },
   termos_confirmacao: {
     name: "Confirmação de Dados",
     description: "Aceite dos termos e confirmação das informações básicas",
-    nextStage: "mapeamento_carreira",
-    prompt: "Após o aceite dos termos, confirme as informações básicas do participante seguindo este script: 'Excelente que você decidiu continuar. Antes de interagirmos mais, você é {nome}, {cargo}, {empresa}, {setor}, certo?' Aguarde a confirmação das informações antes de prosseguir para o próximo estágio.",
+    nextStage: "momento_carreira",
+    prompt: "Após o aceite dos termos, confirme as informações básicas do participante seguindo este script: 'https://www.singue.com.br/termos-de-uso \nExcelente que você decidiu continuar. Antes de interagirmos mais,  precisamos fazer uma confirmação. \nVocê é {nome}, {cargo}, {empresa}, {setor}, certo?' Aguarde a confirmação das informações antes de prosseguir para o próximo estágio.",
     fallbackMessage: "Ótimo! Agora preciso confirmar seus dados: você é {nome}, {cargo} na {empresa}, setor {setor}, correto? ✅",
   },
-  mapeamento_carreira: {
-    name: "Mapeamento de Momento de Carreira",
-    description: "Perguntas interativas sobre momento atual e expectativas",
-    nextStage: "finalizacao",
-    prompt: "Agora faça as perguntas de mapeamento seguindo esta sequência: 1) 'Agora, para personalizar sua jornada, quero ouvir de você. Para responder, você pode usar todos os recursos do whatsapp: áudio, texto, emojis, vídeo. Conte um pouco sobre seu momento atual de carreira. (ex.: expansão, transição, consolidação, estabilidade ou outro)' [Aguarde resposta] 2) 'O que você espera que o Future in Black possa provocar ou desbloquear para sua carreira?' [Aguarde resposta] 3) 'Se você pudesse sair do evento com uma coisa valiosa em mãos (um contato, um insight, uma ideia…), o que seria?' Faça uma pergunta por vez e aguarde as respostas antes de prosseguir.",
+  momento_carreira: {
+    name: "Momento Atual de Carreira",
+    description: "Exploração profunda do momento atual de carreira do participante",
+    nextStage: "expectativas_evento",
+    prompt: "<System prompt> Use a tool de avaliação para saber se foi uma boa resposta ou precisa de mais detalhes. Após a resposta inicial, faça perguntas de aprofundamento baseadas no que foi compartilhado. Se mencionaram transição, explore o que está motivando essa mudança. Se falaram de expansão, pergunte sobre os desafios e oportunidades. Seja curiosa e empática, criando um diálogo genuíno.</System prompt> <Question>Agora, para personalizar sua jornada, preciso ouvir você. \n Quanto mais detalhes você me der melhor será a sua experiência. \n Para responder, você pode usar todos os recursos do WhatsApp: áudio, texto, emojis, vídeo. \n Conte um pouco sobre seu momento atual de carreira. Você está em um período de expansão, transição, consolidação, estabilidade ou outro? Estou aqui para ouvir!</Question>",
     fallbackMessage: "Agora vamos mapear seu momento de carreira! Conte um pouco sobre onde você está agora: expansão, transição, consolidação, estabilidade ou outro momento? 🚀",
+  },
+  expectativas_evento: {
+    name: "Expectativas do Future in Black",
+    description: "Compreensão das expectativas e objetivos para o evento",
+    nextStage: "objetivo_principal",
+    prompt: "<System prompt> Use a tool de avaliação para saber se foi uma boa resposta ou precisa de mais detalhes. Seja específica nas perguntas de follow-up. Se mencionarem networking, explore que tipo de conexões buscam. Se falarem de conhecimento, pergunte sobre áreas específicas de interesse. Se citarem inspiração, investigue que tipo de provocações ou insights seriam mais valiosos para eles neste momento. </System prompt><Question>Baseado no que você compartilhou sobre seu momento de carreira, agora quero entender suas expectativas. O que você espera que o Future in Black possa provocar ou desbloquear para sua carreira? </Question>",
+    fallbackMessage: "Agora me conta: o que você espera que o Future in Black possa provocar ou desbloquear para sua carreira? 💫",
+  },
+  objetivo_principal: {
+    name: "Objetivo Principal do Evento",
+    description: "Identificação do principal valor que o participante quer extrair do evento",
+    nextStage: "finalizacao",
+    prompt: "<System prompt> Explore a resposta com curiosidade. Se mencionarem um contato específico, pergunte sobre o perfil ideal dessa pessoa. Se falarem de insight, investigue sobre que área ou desafio específico. Conecte essa resposta com o que foi compartilhado anteriormente sobre o momento de carreira e expectativas.</System prompt><Question>Para finalizar esse mapeamento, quero entender seu objetivo principal. Se você pudesse sair do evento com uma coisa valiosa em mãos - um contato, um insight, uma ideia, uma oportunidade - o que seria? </Question>",
+    fallbackMessage: "Se você pudesse sair do Future in Black com uma coisa valiosa em mãos (um contato, um insight, uma ideia...), o que seria? 🎯",
   },
   finalizacao: {
     name: "Finalização",
     description: "Encerramento da conversa inicial",
-    prompt: "Agradeça pelas respostas e finalize a conversa de forma calorosa. Mencione que as informações serão usadas para personalizar a experiência no Future in Black e que em breve haverá mais interações. Use um tom empático e motivador, conectando com as respostas dadas sobre carreira.",
+    prompt: "<System prompt> Agradeça pelas respostas e finalize a conversa de forma calorosa. Mencione que as informações serão usadas para personalizar a experiência no Future in Black e que em breve haverá mais interações. Use um tom empático e motivador, conectando com as respostas dadas sobre carreira. Agradeça pelas respostas e finalize a conversa de forma calorosa. Mencione que as informações serão usadas para personalizar a experiência no Future in Black e que em breve haverá mais interações. Use um tom empático e motivador, conectando com as respostas dadas sobre carreira. </System prompt>",
     fallbackMessage: "Muito obrigada por compartilhar comigo! 🙏 Suas respostas vão me ajudar a personalizar sua jornada no Future in Black. Em breve teremos mais conversas incríveis sobre sua carreira! ✨",
   },
 };
@@ -121,7 +128,7 @@ const createAndReturnSession = async (ctx: any, participantId: string) => {
   return {
     _id: sessionId,
     participantId,
-    step: "intro",
+    step: "termos_confirmacao",
     answers: {},
     lastStepAt: Date.now(),
     _creationTime: Date.now(),
@@ -381,9 +388,10 @@ async function generateInterviewResponse(
  */
 function getStageSpecificFocus(stage: InterviewStage): string {
   const focusMap: Record<InterviewStage, string> = {
-    intro: "Estabelecer rapport, apresentar a Fabi e o propósito, obter aceite dos termos de uso",
     termos_confirmacao: "Validar e confirmar dados pessoais e profissionais do participante",
-    mapeamento_carreira: "Mapear momento atual de carreira, expectativas e valor desejado do Future in Black",
+    momento_carreira: "Explorar profundamente o momento atual de carreira do participante com perguntas de aprofundamento",
+    expectativas_evento: "Compreender as expectativas específicas do participante para o Future in Black",
+    objetivo_principal: "Identificar o principal valor que o participante quer extrair do evento",
     finalizacao: "Encerrar com agradecimento caloroso e promessa de personalização da experiência"
   };
   
@@ -400,10 +408,11 @@ function formatRelevantAnswers(answers: any, currentStage: InterviewStage): stri
 
   // Define which previous stages are most relevant for each current stage
   const relevanceMap: Record<InterviewStage, InterviewStage[]> = {
-    intro: [],
-    termos_confirmacao: ["intro"],
-    mapeamento_carreira: ["intro", "termos_confirmacao"],
-    finalizacao: ["termos_confirmacao", "mapeamento_carreira"]
+    termos_confirmacao: [],
+    momento_carreira: ["termos_confirmacao"],
+    expectativas_evento: ["termos_confirmacao", "momento_carreira"],
+    objetivo_principal: ["termos_confirmacao", "momento_carreira", "expectativas_evento"],
+    finalizacao: ["momento_carreira", "expectativas_evento", "objetivo_principal"]
   };
 
   const relevantStages = relevanceMap[currentStage] || [];
@@ -604,29 +613,6 @@ Responda com um objeto JSON contendo:
       };
     }
 
-    // Handle intro stage with consent logic
-    if (currentStage === "intro") {
-      const hasConsent = evaluation.shouldAdvance || /\b(sim|aceito|concordo|ok|vamos|pode|quero|gostaria)\b/i.test(userResponse.toLowerCase());
-      
-      if (hasConsent) {
-        return {
-          nextStage: INTERVIEW_STAGES.intro.nextStage as InterviewStage,
-          shouldAdvance: true,
-          feedback: evaluation.feedback || "Ótimo! Vamos começar nossa jornada de autoconhecimento profissional! 🌟",
-          confidenceScore: evaluation.confidenceScore || 0.9,
-          recommendedAction: "advance"
-        };
-      } else {
-        return {
-          nextStage: null,
-          shouldAdvance: false,
-          feedback: evaluation.feedback || "Entendo. Quando você estiver pronto(a) para essa conversa reflexiva, estarei aqui! 😊",
-          confidenceScore: evaluation.confidenceScore || 0.8,
-          recommendedAction: "clarify"
-        };
-      }
-    }
-
     // Handle termos_confirmacao stage with confirmation logic
     if (currentStage === "termos_confirmacao") {
       const hasConfirmation = evaluation.shouldAdvance || 
@@ -674,17 +660,6 @@ Responda com um objeto JSON contendo:
 const fallbackEvaluation = (currentStage: InterviewStage, userResponse: string) => {
   const wordCount = userResponse.trim().split(/\s+/).length;
   const hasSubstantialContent = wordCount >= 10;
-  
-  if (currentStage === "intro") {
-    const hasConsent = /\b(sim|aceito|concordo|ok|vamos|pode|quero|gostaria)\b/i.test(userResponse.toLowerCase());
-    return {
-      nextStage: hasConsent ? INTERVIEW_STAGES.intro.nextStage as InterviewStage : null,
-      shouldAdvance: hasConsent,
-      feedback: hasConsent ? "Vamos começar! 🌟" : "Quando estiver pronto(a), me avise! 😊",
-      confidenceScore: 0.7,
-      recommendedAction: hasConsent ? "advance" as const : "clarify" as const
-    };
-  }
 
   if (currentStage === "termos_confirmacao") {
     const hasConfirmation = /\b(sim|confirmo|correto|certo|exato|isso|verdade|ok|perfeito|está certo)\b/i.test(userResponse.toLowerCase());
@@ -715,7 +690,7 @@ export const createSession = internalMutation({
   handler: async (ctx, args) => {
     return await ctx.db.insert("interview_sessions", {
       participantId: args.participantId,
-      step: "intro",
+      step: "termos_confirmacao",
       answers: {},
       lastStepAt: Date.now(),
     });

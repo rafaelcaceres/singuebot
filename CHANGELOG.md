@@ -6,7 +6,7 @@
 
 #### Interview Flow Restructure
 - ✅ **BREAKING**: Simplified interview flow from 8 stages to 4 career-focused stages
-- ✅ New flow: `intro → termos_confirmacao → mapeamento_carreira → finalizacao`
+- ✅ New flow: `intro → termos_confirmacao → momento_carreira → expectativas_evento → objetivo_principal → finalizacao`
 - ✅ Replaced ASA methodology with career development focus
 - ✅ Updated all documentation to reflect new interview stages
 - ✅ Modified admin dashboard filters for new stage names
@@ -41,7 +41,7 @@
 
 #### Phase 4: Interview State Machine
 - ✅ Created `convex/functions/interview.ts` with career-focused flow
-- ✅ Stage progression: `intro → termos_confirmacao → mapeamento_carreira → finalizacao`
+- ✅ Stage progression: `intro → termos_confirmacao → momento_carreira → expectativas_evento → objetivo_principal → finalizacao`
 - ✅ RAG integration for context-aware responses
 - ✅ Session state management with LGPD compliance
 - ✅ Consent handling and opt-out support

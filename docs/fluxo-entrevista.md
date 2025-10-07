@@ -14,13 +14,17 @@ O sistema implementa um fluxo de entrevista estruturado em 4 etapas, guiando o u
 ```mermaid
 graph TD
     A[intro] --> B[termos_confirmacao]
-    B --> C[mapeamento_carreira]
-    C --> D[finalizacao]
+    B --> C[momento_carreira]
+    C --> D[expectativas_evento]
+    D --> E[objetivo_principal]
+    E --> F[finalizacao]
     
     style A fill:#e1f5fe
     style B fill:#f3e5f5
     style C fill:#e8f5e8
-    style D fill:#fff3e0
+    style D fill:#e3f2fd
+    style E fill:#fce4ec
+    style F fill:#fff3e0
 ```
 
 ---
@@ -89,31 +93,53 @@ interface TermosStage {
 
 ---
 
-### 3️⃣ Etapa: `mapeamento_carreira`
-**Objetivo**: Explorar trajetória profissional e objetivos de carreira
+### 3️⃣ Etapa: `momento_carreira`
+**Objetivo**: Explorar profundamente o momento atual de carreira
 
 #### Fluxo da Conversa
 ```typescript
-interface MapeamentoCarreiraStage {
-  purpose: "Mapear trajetória profissional, competências e objetivos",
-  duration: "20-30 minutos",
+interface MomentoCarreiraStage {
+  purpose: "Mapear momento atual de carreira com perguntas de aprofundamento",
+  duration: "8-12 minutos",
   keyActions: [
     "Identificar momento atual da carreira",
-    "Explorar expectativas do Future in Black",
-    "Descobrir valor desejado e objetivos",
-    "Reconhecer competências e diferenciais únicos"
+    "Explorar contexto e motivações",
+    "Compreender desafios e oportunidades atuais"
   ]
 }
 ```
 
-#### Áreas de Exploração
+### 4️⃣ Etapa: `expectativas_evento`
+**Objetivo**: Compreender expectativas específicas para o Future in Black
+
+#### Fluxo da Conversa
 ```typescript
-interface CarreiraAreas {
-  momentoCarreira: {
-    prompt: "Onde você sente que está agora na sua jornada profissional?",
-    followUp: [
-      "O que te trouxe até aqui?",
-      "Quais foram os marcos mais importantes?",
+interface ExpectativasEventoStage {
+  purpose: "Entender o que o participante espera do evento",
+  duration: "8-12 minutos",
+  keyActions: [
+    "Explorar expectativas específicas",
+    "Conectar com momento de carreira atual",
+    "Identificar áreas de interesse prioritárias"
+  ]
+}
+```
+
+### 5️⃣ Etapa: `objetivo_principal`
+**Objetivo**: Identificar o principal valor desejado do evento
+
+#### Fluxo da Conversa
+```typescript
+interface ObjetivoPrincipalStage {
+  purpose: "Definir o objetivo principal e valor esperado",
+  duration: "8-12 minutos",
+  keyActions: [
+    "Identificar objetivo principal do evento",
+    "Conectar com expectativas e momento de carreira",
+    "Definir valor específico desejado"
+  ]
+}
+```
       "Como você avalia seu crescimento atual?"
     ]
   },
@@ -208,16 +234,25 @@ Cada etapa possui critérios específicos que devem ser atendidos antes da trans
 - ✅ Usuário demonstra compreensão do processo
 - ✅ Disponibilidade confirmada
 
-#### `termos_confirmacao` → `mapeamento_carreira`
+#### `termos_confirmacao` → `momento_carreira`
 - ✅ Termos de uso aceitos
 - ✅ Política de privacidade compreendida
 - ✅ Confirmação de participação voluntária
 
-#### `mapeamento_carreira` → `finalizacao`
-- ✅ Momento de carreira mapeado
-- ✅ Expectativas do evento clarificadas
-- ✅ Valor desejado identificado
-- ✅ Competências e diferenciais reconhecidos
+#### `momento_carreira` → `expectativas_evento`
+- ✅ Momento atual de carreira explorado
+- ✅ Contexto e motivações compreendidos
+- ✅ Desafios e oportunidades identificados
+
+#### `expectativas_evento` → `objetivo_principal`
+- ✅ Expectativas específicas mapeadas
+- ✅ Conexão com momento de carreira estabelecida
+- ✅ Áreas de interesse prioritárias definidas
+
+#### `objetivo_principal` → `finalizacao`
+- ✅ Objetivo principal identificado
+- ✅ Valor específico desejado definido
+- ✅ Conexão com expectativas e carreira estabelecida
 
 ### Mecanismo de Validação
 ```typescript
@@ -304,7 +339,9 @@ Com base nos dados coletados, o sistema gera:
 type InterviewStage = 
   | 'intro'
   | 'termos_confirmacao' 
-  | 'mapeamento_carreira'
+  | 'momento_carreira'
+  | 'expectativas_evento'
+  | 'objetivo_principal'
   | 'finalizacao'
   | 'completed';
 

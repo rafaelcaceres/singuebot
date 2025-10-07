@@ -146,6 +146,9 @@ export const Participants: React.FC = () => {
             intro: 'Introdução',
             termos_confirmacao: 'Termos & Confirmação',
             mapeamento_carreira: 'Mapeamento de Carreira',
+    momento_carreira: 'Momento de Carreira',
+    expectativas_evento: 'Expectativas do Evento',
+    objetivo_principal: 'Objetivo Principal',
             finalizacao: 'Finalização',
           };
           
@@ -155,6 +158,9 @@ export const Participants: React.FC = () => {
               case 'intro': return 'bg-blue-100 text-blue-800';
               case 'termos_confirmacao': return 'bg-green-100 text-green-800';
               case 'mapeamento_carreira': return 'bg-purple-100 text-purple-800';
+      case 'momento_carreira': return 'bg-purple-100 text-purple-800';
+      case 'expectativas_evento': return 'bg-indigo-100 text-indigo-800';
+      case 'objetivo_principal': return 'bg-pink-100 text-pink-800';
               case 'finalizacao': return 'bg-emerald-100 text-emerald-800';
               default: return 'bg-gray-100 text-gray-800';
             }
@@ -421,6 +427,9 @@ export const Participants: React.FC = () => {
               <option value="intro">Introdução</option>
               <option value="termos_confirmacao">Termos & Confirmação</option>
                 <option value="mapeamento_carreira">Mapeamento de Carreira</option>
+                <option value="momento_carreira">Momento de Carreira</option>
+                <option value="expectativas_evento">Expectativas do Evento</option>
+                <option value="objetivo_principal">Objetivo Principal</option>
                 <option value="finalizacao">Finalização</option>
             </select>
           </div>

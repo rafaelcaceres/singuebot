@@ -6,7 +6,7 @@ O **WhatsApp AI Assistant** é um sistema completo de entrevistas inteligentes v
 
 ### ✨ Principais Funcionalidades
 
-- **Fluxo de Entrevista em 4 Etapas**: `intro → termos_confirmacao → mapeamento_carreira → finalizacao`
+- **Fluxo de Entrevista em 6 Etapas**: `intro → termos_confirmacao → momento_carreira → expectativas_evento → objetivo_principal → finalizacao`
 - **Respostas Aprimoradas por RAG**: Embeddings OpenAI + busca vetorial para respostas contextualmente relevantes
 - **Gerenciamento de Janela de 24h**: Mensagens de sessão vs templates HSM para conformidade WhatsApp
 - **Interface Administrativa Completa**: Gerenciamento de participantes, histórico de conversas, base de conhecimento, analytics
@@ -177,15 +177,17 @@ src/
 O sistema conduz entrevistas através de 4 etapas cuidadosamente projetadas focadas no desenvolvimento de carreira:
 
 ```
-intro → termos_confirmacao → mapeamento_carreira → finalizacao
+intro → termos_confirmacao → momento_carreira → expectativas_evento → objetivo_principal → finalizacao
 ```
 
 #### Detalhes das Etapas
 
 1. **intro**: Coleta de consentimento e boas-vindas
 2. **termos_confirmacao**: Confirmação de termos e validação de dados
-3. **mapeamento_carreira**: Mapeamento de carreira e desenvolvimento profissional
-4. **finalizacao**: Conclusão da sessão e próximos passos
+3. **momento_carreira**: Exploração profunda do momento atual de carreira
+4. **expectativas_evento**: Compreensão das expectativas para o Future in Black
+5. **objetivo_principal**: Identificação do principal valor desejado do evento
+6. **finalizacao**: Encerramento caloroso e promessa de personalização
 
 ### Como Funciona
 

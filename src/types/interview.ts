@@ -1,7 +1,8 @@
 export type InterviewStage = 
-  | "intro"
   | "termos_confirmacao"
-  | "mapeamento_carreira" 
+  | "momento_carreira"
+  | "expectativas_evento"
+  | "objetivo_principal"
   | "finalizacao";
 
 export interface InterviewSession {

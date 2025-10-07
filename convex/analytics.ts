@@ -201,7 +201,7 @@ export const getInterviewAnalytics = query({
     }, {} as Record<string, number>);
 
     // Completion funnel
-    const stages = ["intro", "termos_confirmacao", "mapeamento_carreira", "finalizacao"];
+    const stages = ["intro", "termos_confirmacao", "momento_carreira", "expectativas_evento", "objetivo_principal", "finalizacao"];
     const funnel = stages.map(stage => ({
       stage,
       count: stageDistribution[stage] || 0,
