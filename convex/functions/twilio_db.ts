@@ -1,5 +1,8 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery } from "../_generated/server";
+import { internal } from "../_generated/api";
+import type { Doc } from "../_generated/dataModel";
+import { normalizePhoneNumber } from "../utils/phoneNormalizer";
 
 /**
  * Get or create a participant by phone number
@@ -8,20 +11,59 @@ export const getOrCreateParticipant = internalMutation({
   args: {
     phone: v.string(),
   },
-  handler: async (ctx, args) => {
-    // Check if participant already exists
-    const existing = await ctx.db
+  returns: v.union(
+    v.object({
+      _id: v.id("participants"),
+      _creationTime: v.number(),
+      phone: v.string(),
+      name: v.optional(v.string()),
+      consent: v.boolean(),
+      clusterId: v.optional(v.id("clusters")),
+      tags: v.array(v.string()),
+      createdAt: v.number(),
+      threadId: v.optional(v.string()),
+      cargo: v.optional(v.string()),
+      empresa: v.optional(v.string()),
+      setor: v.optional(v.string()),
+    }),
+    v.null()
+  ),
+  handler: async (ctx, args): Promise<Doc<"participants"> | null> => {
+    // Normalize the phone number
+    const normalizedPhone = normalizePhoneNumber(args.phone);
+    console.log(`🔍 getOrCreateParticipant: ${args.phone} -> ${normalizedPhone}`);
+    
+    // First try to find by normalized phone directly
+    const existingByNormalized = await ctx.db
       .query("participants")
-      .withIndex("by_phone", (q) => q.eq("phone", args.phone))
+      .withIndex("by_phone", (q) => q.eq("phone", normalizedPhone))
       .first();
 
-    if (existing) {
-      return existing;
+    if (existingByNormalized) {
+      console.log(`✅ Found participant by normalized phone: ${existingByNormalized._id}`);
+      return existingByNormalized;
     }
 
-    // Create new participant
+    // If not found, search for variations (handles legacy data)
+    const existingByVariation: Doc<"participants"> | null = await ctx.runQuery(internal.utils.participantSearch.findParticipantByPhone, {
+      phone: args.phone
+    });
+    
+    if (existingByVariation) {
+      console.log(`✅ Found participant by variation, updating phone: ${existingByVariation._id}`);
+      // Update the participant's phone to the normalized version
+      await ctx.db.patch(existingByVariation._id, { 
+        phone: normalizedPhone 
+      });
+      
+      // Return the updated participant
+      return await ctx.db.get(existingByVariation._id);
+    }
+
+    // Create new participant with normalized phone
+    console.log(`➕ Creating new participant with normalized phone: ${normalizedPhone}`);
     const participantId = await ctx.db.insert("participants", {
-      phone: args.phone,
+      phone: normalizedPhone,
       consent: false,
       tags: [],
       createdAt: Date.now(),

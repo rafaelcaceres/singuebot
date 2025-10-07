@@ -22,9 +22,13 @@ import type * as functions_templateConfig from "../functions/templateConfig.js";
 import type * as functions_twilio from "../functions/twilio.js";
 import type * as functions_twilio_db from "../functions/twilio_db.js";
 import type * as http from "../http.js";
+import type * as migrations_consolidateParticipants from "../migrations/consolidateParticipants.js";
 import type * as router from "../router.js";
 import type * as seed from "../seed.js";
+import type * as test_phoneNormalizationTest from "../test/phoneNormalizationTest.js";
 import type * as threadManager from "../threadManager.js";
+import type * as utils_participantSearch from "../utils/participantSearch.js";
+import type * as utils_phoneNormalizer from "../utils/phoneNormalizer.js";
 import type * as whatsapp from "../whatsapp.js";
 
 import type {
@@ -56,9 +60,13 @@ declare const fullApi: ApiFromModules<{
   "functions/twilio": typeof functions_twilio;
   "functions/twilio_db": typeof functions_twilio_db;
   http: typeof http;
+  "migrations/consolidateParticipants": typeof migrations_consolidateParticipants;
   router: typeof router;
   seed: typeof seed;
+  "test/phoneNormalizationTest": typeof test_phoneNormalizationTest;
   threadManager: typeof threadManager;
+  "utils/participantSearch": typeof utils_participantSearch;
+  "utils/phoneNormalizer": typeof utils_phoneNormalizer;
   whatsapp: typeof whatsapp;
 }>;
 declare const fullApiWithMounts: typeof fullApi;

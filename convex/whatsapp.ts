@@ -1,7 +1,9 @@
 import { v } from "convex/values";
 import { internalMutation, mutation, query, action } from "./_generated/server";
 import { internal, api } from "./_generated/api";
-import type { Id } from "./_generated/dataModel";
+import type { Id, Doc } from "./_generated/dataModel";
+import { normalizePhoneNumber } from "./utils/phoneNormalizer";
+import { findParticipantByPhone } from "./utils/participantSearch";
 
 // Helper function to create or get participant
 export const createOrGetParticipant = internalMutation({
@@ -9,20 +11,37 @@ export const createOrGetParticipant = internalMutation({
     phone: v.string(),
     name: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
-    // Check if participant already exists
-    const existingParticipant = await ctx.db
+  returns: v.id("participants"),
+  handler: async (ctx, args): Promise<Id<"participants">> => {
+    // Normalize the phone number to standard format
+    const normalizedPhone = normalizePhoneNumber(args.phone);
+    
+    // First, check if participant already exists with the normalized phone number
+    let existingParticipant = await ctx.db
       .query("participants")
-      .withIndex("by_phone", (q) => q.eq("phone", args.phone))
+      .withIndex("by_phone", (q) => q.eq("phone", normalizedPhone))
       .unique();
 
+    // If not found with normalized number, check all variations
+    if (!existingParticipant) {
+      existingParticipant = await ctx.runQuery(internal.utils.participantSearch.findParticipantByPhone, {
+        phone: normalizedPhone,
+      });
+    }
+
     if (existingParticipant) {
+      // If found participant has a different phone format, update it to normalized
+      if (existingParticipant.phone !== normalizedPhone) {
+        await ctx.db.patch(existingParticipant._id, {
+          phone: normalizedPhone,
+        });
+      }
       return existingParticipant._id;
     }
 
-    // Create new participant
+    // Create new participant with normalized phone number
     const participantId = await ctx.db.insert("participants", {
-      phone: args.phone,
+      phone: normalizedPhone,
       name: args.name,
       consent: false, // Default to false, can be updated later
       tags: [],
@@ -38,7 +57,8 @@ export const createOrGetConversation = internalMutation({
   args: {
     participantId: v.id("participants"),
   },
-  handler: async (ctx, args) => {
+  returns: v.id("conversations"),
+  handler: async (ctx, args): Promise<Id<"conversations">> => {
     // Check if there's an open conversation for this participant
     const existingConversation = await ctx.db
       .query("conversations")
@@ -73,21 +93,22 @@ export const getMessages = query({
     phoneNumber: v.string(),
     limit: v.optional(v.number()),
   },
-  handler: async (ctx, args) => {
+  returns: v.array(v.any()),
+  handler: async (ctx, args): Promise<Array<Doc<"whatsappMessages">>> => {
     const { phoneNumber, limit = 50 } = args;
 
-    // Find the participant by phone number
-    const participant = await ctx.db
-      .query("participants")
-      .withIndex("by_phone", (q) => q.eq("phone", phoneNumber))
-      .unique();
+    // Normalize the phone number and find participant by any equivalent variation
+    const normalizedPhone = normalizePhoneNumber(phoneNumber);
+    const participant: Doc<"participants"> | null = await ctx.runQuery(internal.utils.participantSearch.findParticipantByPhone, {
+      phone: normalizedPhone,
+    });
 
     if (!participant) {
       return [];
     }
 
     // Get messages for this participant
-    const messages = await ctx.db
+    const messages: Array<Doc<"whatsappMessages">> = await ctx.db
       .query("whatsappMessages")
       .withIndex("by_participant", (q) => q.eq("participantId", participant._id))
       .order("desc")

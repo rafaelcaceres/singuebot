@@ -21,8 +21,8 @@ const INTERVIEW_STAGES: Record<InterviewStage, {
     name: "Aceite de Termos",
     description: "Envio do link dos termos e confirmação do aceite",
     nextStage: "confirmacao_dados",
-    prompt: "Você já deu Olá na mensagem anterior através de um template do WhatsApp. O usuário respondeu que quer receber os termos. Envie o link dos termos de uso do Future in Black de forma amigável e peça para que ele leia e responda 'aceito' se concordar. Link: https://www.singue.com.br/termos-de-uso",
-    fallbackMessage: "Ótimo! Aqui estão os termos de uso do Future in Black: https://www.singue.com.br/termos-de-uso\n\nPor favor, leia com atenção e responda 'aceito' se concordar. 📄",
+    prompt: "Você já deu Olá na mensagem anterior através de um template do WhatsApp. O usuário respondeu que quer receber os termos. Envie o link dos termos de uso do Bot de forma amigável e peça para que ele leia e responda 'aceito' se concordar. Link: https://www.singue.com.br/termos-de-uso",
+    fallbackMessage: "Ótimo! Aqui estão os termos de uso do Bot: https://www.singue.com.br/termos-de-uso\n\nPor favor, leia com atenção e responda 'aceito' se concordar. 📄",
   },
   confirmacao_dados: {
     name: "Confirmação de Dados",
@@ -588,19 +588,24 @@ async function determineNextStep(
 }> {
   console.log(`🔍 Determining next step for stage: ${currentStage}`);
 
-  // Security check - detect prompt injection attempts
+  // Security check - detect prompt injection attempts and off-topic content
   const suspiciousPatterns = [
-    /ignore\s+(previous|all)\s+instructions?/i,
+    /ignore\s+(previous|all|everything)\s+(instructions?|prompts?|commands?)/i,
+    /esqueç[ae]\s+(tudo|todas?|anterior|acima)/i, // Portuguese: "esqueça tudo/todas"
     /act\s+as\s+(?:a\s+)?(?:different|new)/i,
     /pretend\s+(?:you\s+are|to\s+be)/i,
     /system\s*[:]\s*you\s+are/i,
     /\[INST\]|\[\/INST\]/i,
-    /###\s*(?:instruction|system|prompt)/i
+    /###\s*(?:instruction|system|prompt)/i,
+    /reset\s+(context|conversation|memory)/i,
+    /delete\s+(previous|all)\s+(messages?|context)/i,
+    /\b(receita|recipe|bolo|cake|comida|food|piada|joke)\b/i // Clearly off-topic words
   ];
 
   const hasSuspiciousContent = suspiciousPatterns.some(pattern => pattern.test(userResponse));
 
   if (hasSuspiciousContent) {
+    console.log(`🚨 Security: Detected suspicious content in stage ${currentStage}: "${userResponse}"`);
     return {
       nextStage: null,
       shouldAdvance: false,
