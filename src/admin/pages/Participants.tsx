@@ -12,12 +12,13 @@ import {
   type SortingState,
   type ColumnFiltersState,
 } from '@tanstack/react-table';
-import { Plus, MessageSquare } from 'lucide-react';
+import { Plus, MessageSquare, Upload } from 'lucide-react';
 import { api } from '../../../convex/_generated/api';
 import { ConversationViewer } from '../components/ConversationViewer';
 import { AddParticipantForm } from '../components/AddParticipantForm';
 import { EditParticipantForm } from '../components/EditParticipantForm';
 import { TemplateModal } from '../components/TemplateModal';
+import { ImportParticipantsModal } from '../components/ImportParticipantsModal';
 import { usePermissions } from '../../hooks/useAuth';
 
 interface Participant {
@@ -54,6 +55,7 @@ export const Participants: React.FC = () => {
   // Multi-selection state
   const [selectedParticipants, setSelectedParticipants] = useState<Set<string>>(new Set());
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   // Filters state
   const [clusterFilter, setClusterFilter] = useState<string>('');
@@ -362,13 +364,22 @@ export const Participants: React.FC = () => {
             </button>
           )}
           {canManageUsers && (
-            <button
-              onClick={() => setIsAddParticipantOpen(true)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center gap-2"
-            >
-              <Plus className="h-4 w-4" />
-              Adicionar Participante
-            </button>
+            <>
+              <button
+                onClick={() => setIsImportModalOpen(true)}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 flex items-center gap-2"
+              >
+                <Upload className="h-4 w-4" />
+                Importar CSV
+              </button>
+              <button
+                onClick={() => setIsAddParticipantOpen(true)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                Adicionar Participante
+              </button>
+            </>
           )}
           <button
             onClick={handleExportData}
@@ -585,6 +596,16 @@ export const Participants: React.FC = () => {
         participantId={editParticipantId as any}
         onSuccess={() => {
           setEditParticipantId(null);
+          // Refresh data by triggering a re-fetch
+          window.location.reload();
+        }}
+      />
+
+      {/* Import Participants Modal */}
+      <ImportParticipantsModal
+        open={isImportModalOpen}
+        onOpenChange={setIsImportModalOpen}
+        onSuccess={() => {
           // Refresh data by triggering a re-fetch
           window.location.reload();
         }}

@@ -435,6 +435,119 @@ export const deleteParticipant = mutation({
   },
 });
 
+// Helper function to normalize phone numbers
+const normalizePhoneNumber = (phone: string): string | null => {
+  // Remove all non-digit characters
+  const digits = phone.replace(/\D/g, '');
+  
+  // Handle Brazilian numbers
+  if (digits.length === 11 && digits.startsWith('55')) {
+    return `whatsapp:+${digits}`;
+  }
+  
+  // Handle numbers with country code
+  if (digits.length >= 10 && digits.length <= 15) {
+    // If doesn't start with country code, assume Brazil (+55)
+    if (digits.length === 10 || digits.length === 11) {
+      return `whatsapp:+55${digits}`;
+    }
+    return `whatsapp:+${digits}`;
+  }
+  
+  return null;
+};
+
+export const importParticipantsFromCSV = mutation({
+  args: {
+    csvData: v.array(v.object({
+      nome: v.string(),
+      telefone: v.string(),
+      cargo: v.optional(v.string()),
+      empresa: v.optional(v.string()),
+      setor: v.optional(v.string()),
+    })),
+    clusterId: v.optional(v.id("clusters")),
+  },
+  handler: async (ctx, args) => {
+    const results = {
+      success: 0,
+      errors: [] as Array<{ row: number; error: string; data: any }>,
+      duplicates: [] as Array<{ row: number; phone: string; existingId: string }>,
+    };
+
+    for (let i = 0; i < args.csvData.length; i++) {
+      const row = args.csvData[i];
+      const rowNumber = i + 1;
+
+      try {
+        // Validate required fields
+        if (!row.nome || !row.telefone) {
+          results.errors.push({
+            row: rowNumber,
+            error: "Nome e telefone são obrigatórios",
+            data: row,
+          });
+          continue;
+        }
+
+        // Normalize phone number
+        const normalizedPhone = normalizePhoneNumber(row.telefone);
+        
+        if (!normalizedPhone) {
+          results.errors.push({
+            row: rowNumber,
+            error: "Número de telefone inválido",
+            data: row,
+          });
+          continue;
+        }
+
+        // Check for existing participant
+        const existingParticipant = await ctx.db
+          .query("participants")
+          .withIndex("by_phone", (q) => q.eq("phone", normalizedPhone))
+          .first();
+
+        if (existingParticipant) {
+          results.duplicates.push({
+            row: rowNumber,
+            phone: normalizedPhone,
+            existingId: existingParticipant._id,
+          });
+          continue;
+        }
+
+        // Create new participant
+        const participantId = await ctx.db.insert("participants", {
+          phone: normalizedPhone,
+          name: row.nome.trim(),
+          consent: false, // Default to false, can be updated later
+          clusterId: args.clusterId,
+          cargo: row.cargo?.trim() || undefined,
+          empresa: row.empresa?.trim() || undefined,
+          setor: row.setor?.trim() || undefined,
+          tags: [],
+          createdAt: Date.now(),
+        });
+
+        // Create initial conversation for the participant
+        await getOrCreateConversation(ctx, participantId);
+
+        results.success++;
+
+      } catch (error) {
+        results.errors.push({
+          row: rowNumber,
+          error: error instanceof Error ? error.message : "Erro desconhecido",
+          data: row,
+        });
+      }
+    }
+
+    return results;
+  },
+});
+
 // Conversation Management Functions
 
 export const getConversationMessages = query({
@@ -459,9 +572,9 @@ export const getConversationMessages = query({
       .order("desc")
       .take(args.limit || 100);
 
-    // Combine and sort all messages
+    // Combine and sort all messages (oldest first for chat display)
     const allMessages = [...messages, ...outboundMessages]
-      .sort((a, b) => b._creationTime - a._creationTime)
+      .sort((a, b) => a._creationTime - b._creationTime)
       .slice(0, args.limit || 100);
 
     return {
