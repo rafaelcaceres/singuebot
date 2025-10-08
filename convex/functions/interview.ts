@@ -18,17 +18,17 @@ const INTERVIEW_STAGES: Record<InterviewStage, {
   fallbackMessage?: string;
 }> = {
   termos_aceite: {
-    name: "Aceite de Termos",
-    description: "Envio do link dos termos e confirmação do aceite",
+    name: "Aceite da Política de Privacidade",
+    description: "Envio do link da política de privacidade e confirmação do aceite",
     nextStage: "confirmacao_dados",
-    prompt: "Você já deu Olá na mensagem anterior através de um template do WhatsApp. O usuário respondeu que quer receber os termos. Envie o link dos termos de uso do Bot de forma amigável e peça para que ele leia e responda 'aceito' se concordar. Link: https://www.singue.com.br/termos-de-uso",
-    fallbackMessage: "Ótimo! Aqui estão os termos de uso do Bot: https://www.singue.com.br/termos-de-uso\n\nPor favor, leia com atenção e responda 'aceito' se concordar. 📄",
+    prompt: "Você já deu Olá na mensagem anterior através de um template do WhatsApp. O usuário respondeu que quer receber os termos. Envie o link das politica de privacidade desse chatbot de forma amigável e peça para que ele leia e responda 'aceito' se concordar. Link: https://singue.com.br/politica-privacidade/",
+    fallbackMessage: "Ótimo! Aqui estão as políticas de privacidade desse chatbot: https://singue.com.br/politica-privacidade/ \n\nPor favor, leia com atenção e responda 'aceito' se concordar. 📄",
   },
   confirmacao_dados: {
     name: "Confirmação de Dados",
     description: "Confirmação de dados do usuário",
     nextStage: "momento_carreira",
-    prompt: "<System prompt>Após o aceite dos termos, confirme as informações básicas do participante seguindo este script:</System prompt> <Question>Excelente que você decidiu continuar. Antes de interagirmos mais,  precisamos fazer uma confirmação. \nVocê é {nome}, {cargo}, {empresa}, {setor}, certo?' Aguarde a confirmação das informações antes de prosseguir para o próximo estágio.</Question>",
+    prompt: "<System prompt>Após o aceite da politica de privacidade, confirme as informações básicas do participante seguindo este script:</System prompt> <Question>Excelente que você decidiu continuar. Antes de interagirmos mais,  precisamos fazer uma confirmação. \nVocê é {nome}, {cargo}, {empresa}, {setor}, certo?' Aguarde a confirmação das informações antes de prosseguir para o próximo estágio.</Question>",
     fallbackMessage: "Ótimo! Agora preciso confirmar seus dados: você é {nome}, {cargo} na {empresa}, setor {setor}, correto? ✅",
     
   },
@@ -404,7 +404,7 @@ async function generateInterviewResponse(
  */
 function getStageSpecificFocus(stage: InterviewStage): string {
   const focusMap: Record<InterviewStage, string> = {
-    termos_aceite: "Enviar os termos e garantir que o usuario aceitou para continuar",
+    termos_aceite: "Enviar a politica de privacidade e garantir que o usuario aceitou para continuar",
     confirmacao_dados: "Confirmar as informações básicas do participante",
     momento_carreira: "Explorar profundamente o momento atual de carreira do participante com perguntas de aprofundamento",
     expectativas_evento: "Compreender as expectativas específicas do participante para o Future in Black",
@@ -476,7 +476,7 @@ async function generateLLMInterviewResponse(
         // Mark that we're sending the link now
         // This needs to be updated in the session after we return
         return {
-          text: personalizedContent.fallbackMessage || "Ótimo! Aqui estão os termos de uso: https://www.singue.com.br/termos-de-uso\n\nPor favor, leia e responda 'aceito' se concordar. 📄",
+          text: personalizedContent.fallbackMessage || "Ótimo! Aqui esta a politica de privacidade desse chatbot: https://www.singue.com.br/politica-privacidade \n\nPor favor, leia e responda 'aceito' se concordar. 📄",
           shouldUpdateTermsStatus: true, // Signal that we sent the link
         };
       }
