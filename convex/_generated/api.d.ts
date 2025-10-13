@@ -11,6 +11,7 @@
 import type * as admin from "../admin.js";
 import type * as agents from "../agents.js";
 import type * as analytics from "../analytics.js";
+import type * as analytics_optimized from "../analytics_optimized.js";
 import type * as auth from "../auth.js";
 import type * as createAdminUser from "../createAdminUser.js";
 import type * as debug from "../debug.js";
@@ -49,6 +50,7 @@ declare const fullApi: ApiFromModules<{
   admin: typeof admin;
   agents: typeof agents;
   analytics: typeof analytics;
+  analytics_optimized: typeof analytics_optimized;
   auth: typeof auth;
   createAdminUser: typeof createAdminUser;
   debug: typeof debug;

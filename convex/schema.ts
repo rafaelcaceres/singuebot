@@ -100,11 +100,40 @@ const applicationTables = {
     tags: v.array(v.string()), // Custom tags
     createdAt: v.number(), // Registration timestamp
     threadId: v.optional(v.string()), // Active conversation thread ID for context persistence
-    
+
+    // External tracking ID (from survey/form system)
+    externalId: v.optional(v.string()), // Original survey/form ID for import tracking
+    importSource: v.optional(v.string()), // CSV filename for filtering imports
+
     // Professional information fields
     cargo: v.optional(v.string()), // Job position/role
-    empresa: v.optional(v.string()), // Company name
+    empresa: v.optional(v.string()), // Company name (free text)
+    empresaPrograma: v.optional(v.string()), // Company name from program dropdown (more reliable)
     setor: v.optional(v.string()), // Industry sector
+
+    // Demographic and program fields (for CSV import)
+    email: v.optional(v.string()), // Professional email
+    estado: v.optional(v.string()), // Brazilian state
+    raca: v.optional(v.string()), // Race/ethnicity
+    genero: v.optional(v.string()), // Gender identity
+    annosCarreira: v.optional(v.string()), // Years of career experience
+    senioridade: v.optional(v.string()), // Seniority level
+    linkedin: v.optional(v.string()), // LinkedIn URL
+    tipoOrganizacao: v.optional(v.string()), // Organization type
+    programaMarca: v.optional(v.string()), // Program brand (FIB, TEMPLO, MOVER 1, etc)
+    receitaAnual: v.optional(v.string()), // Annual revenue range
+
+    // Additional identity and verification fields
+    transgenero: v.optional(v.boolean()), // Transgender identity
+    pais: v.optional(v.string()), // Country of origin
+    portfolioUrl: v.optional(v.string()), // Portfolio or personal website URL
+
+    // Program-specific flags for segmentation
+    blackSisterInLaw: v.optional(v.boolean()), // Black Sister in Law membership
+    mercadoFinanceiro: v.optional(v.boolean()), // Works in financial market
+    membroConselho: v.optional(v.boolean()), // Board member status
+    programasPactua: v.optional(v.string()), // Previous Pactuá programs
+    programasSingue: v.optional(v.string()), // Previous Singuê programs
   })
     .index("by_phone", ["phone"])
     .index("by_cluster", ["clusterId"])
@@ -114,7 +143,12 @@ const applicationTables = {
     .index("by_cargo", ["cargo"])
     .index("by_empresa", ["empresa"])
     .index("by_setor", ["setor"])
-    .index("by_empresa_setor", ["empresa", "setor"]),
+    .index("by_empresa_setor", ["empresa", "setor"])
+    .index("by_email", ["email"])
+    .index("by_programa_marca", ["programaMarca"])
+    .index("by_estado", ["estado"])
+    .index("by_external_id", ["externalId"]) // Critical for deduplication
+    .index("by_import_source", ["importSource"]), // Filter by CSV filename
 
   organizers: defineTable({
     email: v.string(), // Organizer email
@@ -143,6 +177,16 @@ const applicationTables = {
     .index("by_participant", ["participantId"])
     .index("by_step", ["step"])
     .index("by_last_step", ["lastStepAt"]),
+
+  participant_profiles: defineTable({
+    participantId: v.id("participants"), // Link to participant
+    realizacoes: v.optional(v.string()), // Professional achievements and impact
+    visaoFuturo: v.optional(v.string()), // Career vision for next 5 years
+    desafiosSuperados: v.optional(v.string()), // Barriers overcome in career
+    desafiosAtuais: v.optional(v.string()), // Current challenges for career growth
+    motivacao: v.optional(v.string()), // Motivation for joining program
+  })
+    .index("by_participant", ["participantId"]),
 
   templates: defineTable({
     name: v.string(), // Template friendly name

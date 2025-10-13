@@ -86,6 +86,7 @@ export const processInboundMessage = internalAction({
   handler: async (ctx, args) => {
     try {
       console.log("📱 Twilio: Processing inbound message from", args.from);
+      console.log("📱 Twilio: Message body:", args.body);
 
       // Check if this is an audio message and transcribe if needed
       let processedBody = args.body;
@@ -180,19 +181,7 @@ export const processInboundMessage = internalAction({
         console.log("✅ Twilio: Consent granted for", args.from);
       }
 
-      // Check for opt-out messages
-      if (isOptOutMessage(args.body)) {
-        await ctx.runMutation(internal.functions.twilio_db.updateParticipantConsent, {
-          participantId: participant._id,
-          consent: false,
-        });
-        
-        await ctx.runAction(api.functions.twilio.sendMessage, {
-          to: args.from,
-          body: "Entendido. Você foi removido de nossa lista e não receberá mais mensagens. Obrigado! 👋",
-        });
-        return;
-      }
+
 
       // Check 24h window for session vs HSM template logic  
       const window = await checkMessageWindow(args.from);
@@ -568,12 +557,6 @@ function isConsentMessage(body: string): boolean {
   const lowerBody = body.toLowerCase().trim();
   const consentWords = ["sim", "aceito", "concordo", "ok", "yes", "agree"];
   return consentWords.some(word => lowerBody.includes(word));
-}
-
-function isOptOutMessage(body: string): boolean {
-  const lowerBody = body.toLowerCase().trim();
-  const optOutWords = ["stop", "parar", "sair", "cancelar", "não quero", "nao quero"];
-  return optOutWords.some(word => lowerBody.includes(word));
 }
 
 async function checkMessageWindow(phoneNumber: string): Promise<{

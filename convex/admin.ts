@@ -188,18 +188,33 @@ export const getParticipants = query({
     clusterId: v.optional(v.id("clusters")),
     consent: v.optional(v.boolean()),
     stage: v.optional(v.string()),
+    importSource: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     // Build query with most selective index first
     let participants;
-    
-    if (args.clusterId) {
+
+    if (args.importSource) {
+      // Filter by import source (CSV filename)
+      participants = await ctx.db
+        .query("participants")
+        .withIndex("by_import_source", (q) => q.eq("importSource", args.importSource!))
+        .collect();
+
+      // Apply additional filters in memory
+      if (args.clusterId) {
+        participants = participants.filter(p => p.clusterId === args.clusterId);
+      }
+      if (args.consent !== undefined) {
+        participants = participants.filter(p => p.consent === args.consent!);
+      }
+    } else if (args.clusterId) {
       // Use cluster index (likely most selective)
       participants = await ctx.db
         .query("participants")
         .withIndex("by_cluster", (q) => q.eq("clusterId", args.clusterId))
         .collect();
-      
+
       // Apply consent filter in memory if needed
        if (args.consent !== undefined) {
          participants = participants.filter(p => p.consent === args.consent!);
@@ -462,22 +477,59 @@ export const importParticipantsFromCSV = mutation({
     csvData: v.array(v.object({
       nome: v.string(),
       telefone: v.string(),
+      externalId: v.optional(v.string()), // Survey/form ID for tracking
+      email: v.optional(v.string()),
       cargo: v.optional(v.string()),
       empresa: v.optional(v.string()),
+      empresaPrograma: v.optional(v.string()), // From dropdown (more reliable)
       setor: v.optional(v.string()),
+      // Demographic fields
+      estado: v.optional(v.string()),
+      raca: v.optional(v.string()),
+      genero: v.optional(v.string()),
+      annosCarreira: v.optional(v.string()),
+      senioridade: v.optional(v.string()),
+      linkedin: v.optional(v.string()),
+      tipoOrganizacao: v.optional(v.string()),
+      programaMarca: v.optional(v.string()),
+      receitaAnual: v.optional(v.string()),
+      // Additional identity fields
+      transgenero: v.optional(v.boolean()),
+      pais: v.optional(v.string()),
+      portfolioUrl: v.optional(v.string()),
+      // Program-specific flags
+      blackSisterInLaw: v.optional(v.boolean()),
+      mercadoFinanceiro: v.optional(v.boolean()),
+      membroConselho: v.optional(v.boolean()),
+      programasPactua: v.optional(v.string()),
+      programasSingue: v.optional(v.string()),
+      // Rich text profile fields
+      realizacoes: v.optional(v.string()),
+      visaoFuturo: v.optional(v.string()),
+      desafiosSuperados: v.optional(v.string()),
+      desafiosAtuais: v.optional(v.string()),
+      motivacao: v.optional(v.string()),
     })),
     clusterId: v.optional(v.id("clusters")),
+    importSource: v.optional(v.string()), // CSV filename for filtering
   },
   handler: async (ctx, args) => {
     const results = {
       success: 0,
       errors: [] as Array<{ row: number; error: string; data: any }>,
-      duplicates: [] as Array<{ row: number; phone: string; existingId: string }>,
+      duplicates: [] as Array<{
+        row: number;
+        identifierType: "email" | "phone";
+        identifierValue: string;
+        existingId: string;
+        email?: string;
+      }>,
     };
 
     for (let i = 0; i < args.csvData.length; i++) {
       const row = args.csvData[i];
       const rowNumber = i + 1;
+      const trimmedPhone = row.telefone.trim();
 
       try {
         // Validate required fields
@@ -491,8 +543,8 @@ export const importParticipantsFromCSV = mutation({
         }
 
         // Normalize phone number
-        const normalizedPhone = normalizePhoneNumber(row.telefone);
-        
+        const normalizedPhone = normalizePhoneNumber(trimmedPhone || row.telefone);
+
         if (!normalizedPhone) {
           results.errors.push({
             row: rowNumber,
@@ -502,33 +554,108 @@ export const importParticipantsFromCSV = mutation({
           continue;
         }
 
-        // Check for existing participant
-        const existingParticipant = await ctx.db
-          .query("participants")
-          .withIndex("by_phone", (q) => q.eq("phone", normalizedPhone))
-          .first();
+        const trimmedEmail = row.email?.trim();
+        const normalizedEmail = trimmedEmail?.toLowerCase();
+
+        // Check for existing participant (priority order: email > phone)
+        let existingParticipant = null;
+        let duplicateField: "email" | "phone" | null = null;
+        let duplicateValue: string | null = null;
+
+        if (normalizedEmail) {
+          existingParticipant = await ctx.db
+            .query("participants")
+            .withIndex("by_email", (q) => q.eq("email", normalizedEmail))
+            .first();
+
+          // Fallback for legacy records stored with original casing
+          if (!existingParticipant && trimmedEmail && trimmedEmail !== normalizedEmail) {
+            existingParticipant = await ctx.db
+              .query("participants")
+              .withIndex("by_email", (q) => q.eq("email", trimmedEmail))
+              .first();
+          }
+
+          if (existingParticipant) {
+            duplicateField = "email";
+            duplicateValue = trimmedEmail || normalizedEmail;
+          }
+        }
+
+        if (!existingParticipant) {
+          existingParticipant = await ctx.db
+            .query("participants")
+            .withIndex("by_phone", (q) => q.eq("phone", normalizedPhone))
+            .first();
+
+          if (existingParticipant) {
+            duplicateField = "phone";
+            duplicateValue = trimmedPhone || row.telefone;
+          }
+        }
 
         if (existingParticipant) {
           results.duplicates.push({
             row: rowNumber,
-            phone: normalizedPhone,
+            identifierType: duplicateField || "phone",
+            identifierValue: duplicateValue || trimmedPhone || row.telefone,
             existingId: existingParticipant._id,
+            email: normalizedEmail || trimmedEmail || undefined,
           });
           continue;
         }
 
-        // Create new participant
+        // Create new participant with all fields
         const participantId = await ctx.db.insert("participants", {
           phone: normalizedPhone,
           name: row.nome.trim(),
           consent: false, // Default to false, can be updated later
           clusterId: args.clusterId,
+          // External tracking
+          externalId: row.externalId?.trim() || undefined,
+          importSource: args.importSource?.trim() || undefined,
+          // Professional fields
           cargo: row.cargo?.trim() || undefined,
           empresa: row.empresa?.trim() || undefined,
+          empresaPrograma: row.empresaPrograma?.trim() || undefined,
           setor: row.setor?.trim() || undefined,
+          // Demographic fields
+          email: normalizedEmail || trimmedEmail || undefined,
+          estado: row.estado?.trim() || undefined,
+          raca: row.raca?.trim() || undefined,
+          genero: row.genero?.trim() || undefined,
+          annosCarreira: row.annosCarreira?.trim() || undefined,
+          senioridade: row.senioridade?.trim() || undefined,
+          linkedin: row.linkedin?.trim() || undefined,
+          tipoOrganizacao: row.tipoOrganizacao?.trim() || undefined,
+          programaMarca: row.programaMarca?.trim() || undefined,
+          receitaAnual: row.receitaAnual?.trim() || undefined,
+          // Additional identity fields
+          transgenero: row.transgenero,
+          pais: row.pais?.trim() || undefined,
+          portfolioUrl: row.portfolioUrl?.trim() || undefined,
+          // Program-specific flags
+          blackSisterInLaw: row.blackSisterInLaw,
+          mercadoFinanceiro: row.mercadoFinanceiro,
+          membroConselho: row.membroConselho,
+          programasPactua: row.programasPactua?.trim() || undefined,
+          programasSingue: row.programasSingue?.trim() || undefined,
           tags: [],
           createdAt: Date.now(),
         });
+
+        // Create participant profile with rich text fields (if any exist)
+        if (row.realizacoes || row.visaoFuturo || row.desafiosSuperados ||
+            row.desafiosAtuais || row.motivacao) {
+          await ctx.db.insert("participant_profiles", {
+            participantId,
+            realizacoes: row.realizacoes?.trim() || undefined,
+            visaoFuturo: row.visaoFuturo?.trim() || undefined,
+            desafiosSuperados: row.desafiosSuperados?.trim() || undefined,
+            desafiosAtuais: row.desafiosAtuais?.trim() || undefined,
+            motivacao: row.motivacao?.trim() || undefined,
+          });
+        }
 
         // Create initial conversation for the participant
         await getOrCreateConversation(ctx, participantId);

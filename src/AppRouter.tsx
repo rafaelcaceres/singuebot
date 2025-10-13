@@ -1,6 +1,6 @@
-import React from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { Authenticated, Unauthenticated } from "convex/react";
+import React, { useEffect } from "react";
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
+import { Authenticated, Unauthenticated, useConvexAuth } from "convex/react";
 import App from "./App";
 import { AdminLayout } from "./admin/layout/AdminLayout";
 import Dashboard from "./admin/pages/Dashboard";
@@ -10,6 +10,7 @@ import { KnowledgePage } from "./admin/pages/KnowledgePage";
 import { Participants } from "./admin/pages/Participants";
 import { UserManagement } from "./admin/pages/UserManagement";
 import { TemplatesPage } from "./admin/pages/TemplatesPage";
+import DashboardParticipants from "./admin/pages/DashboardParticipants";
 
 function ImportPage() {
   return <div className="p-8">Importar CSV - Em desenvolvimento</div>;
@@ -23,9 +24,31 @@ function SettingsPage() {
   return <div className="p-8">Configurações - Em desenvolvimento</div>;
 }
 
+// Component to handle authentication redirects
+function AuthRedirectHandler() {
+  const { isAuthenticated, isLoading } = useConvexAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (!isLoading) {
+      if (isAuthenticated && location.pathname === "/login") {
+        // If user is authenticated and on login page, redirect to dashboard
+        void navigate("/", { replace: true });
+      } else if (!isAuthenticated && location.pathname !== "/login") {
+        // If user is not authenticated and not on login page, redirect to login
+        void navigate("/login", { replace: true });
+      }
+    }
+  }, [isAuthenticated, isLoading, location.pathname, navigate]);
+
+  return null;
+}
+
 export function AppRouter() {  
   return (
     <BrowserRouter>
+      <AuthRedirectHandler />
       <Routes>
         {/* Public routes */}
         <Route path="/login" element={
@@ -63,12 +86,13 @@ export function AppRouter() {
           <Route path="users" element={<UserManagement />} />
           <Route path="templates" element={<TemplatesPage />} />
           <Route path="import" element={<ImportPage />} />
+          <Route path="dashboard-participants" element={<DashboardParticipants />} />
           <Route path="jobs" element={<JobsPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>
 
-        {/* Redirect unauthenticated access to login */}
-        <Route path="/*" element={
+        {/* Catch-all route for unauthenticated users */}
+        <Route path="*" element={
           <Unauthenticated>
             <Navigate to="/login" replace />
           </Unauthenticated>
