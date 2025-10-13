@@ -35,8 +35,8 @@ function AuthRedirectHandler() {
       if (isAuthenticated && location.pathname === "/login") {
         // If user is authenticated and on login page, redirect to dashboard
         void navigate("/", { replace: true });
-      } else if (!isAuthenticated && location.pathname !== "/login") {
-        // If user is not authenticated and not on login page, redirect to login
+      } else if (!isAuthenticated && location.pathname !== "/login" && location.pathname !== "/dashboard-participants") {
+        // If user is not authenticated and not on login page or dashboard-participants, redirect to login
         void navigate("/login", { replace: true });
       }
     }
@@ -67,6 +67,9 @@ export function AppRouter() {
           </Unauthenticated>
         } />
 
+        {/* Public dashboard-participants route */}
+        <Route path="/dashboard-participants" element={<DashboardParticipants />} />
+
         {/* Main authenticated routes */}
         <Route path="/" element={
           <Authenticated>
@@ -86,7 +89,6 @@ export function AppRouter() {
           <Route path="users" element={<UserManagement />} />
           <Route path="templates" element={<TemplatesPage />} />
           <Route path="import" element={<ImportPage />} />
-          <Route path="dashboard-participants" element={<DashboardParticipants />} />
           <Route path="jobs" element={<JobsPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>
