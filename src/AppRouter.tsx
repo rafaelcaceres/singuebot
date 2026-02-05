@@ -11,6 +11,9 @@ import { Participants } from "./admin/pages/Participants";
 import { UserManagement } from "./admin/pages/UserManagement";
 import { TemplatesPage } from "./admin/pages/TemplatesPage";
 import DashboardParticipants from "./admin/pages/DashboardParticipants";
+import { ParticipantExplorer } from "./admin/pages/ParticipantExplorer";
+import { ParticipantProfile } from "./admin/pages/ParticipantProfile";
+import { ParticipantClusters } from "./admin/pages/ParticipantClusters";
 
 function ImportPage() {
   return <div className="p-8">Importar CSV - Em desenvolvimento</div>;
@@ -84,6 +87,9 @@ export function AppRouter() {
           
           {/* Admin pages */}
           <Route path="participants" element={<Participants />} />
+          <Route path="participants/:id" element={<ParticipantProfile />} />
+          <Route path="relations" element={<ParticipantExplorer />} />
+          <Route path="clusters" element={<ParticipantClusters />} />
           <Route path="conversations" element={<Conversations />} />
           <Route path="knowledge" element={<KnowledgePage />} />
           <Route path="users" element={<UserManagement />} />

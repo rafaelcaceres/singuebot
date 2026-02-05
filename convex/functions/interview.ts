@@ -436,7 +436,7 @@ function formatRelevantAnswers(answers: any, currentStage: InterviewStage): stri
   const relevantStages = relevanceMap[currentStage] || [];
   const relevantAnswers: Record<string, any> = {};
 
-  relevantStages.forEach(stage => {
+  relevantStages.forEach((stage: any) => {
     if (answers[stage]) {
       relevantAnswers[stage] = answers[stage];
     }
@@ -602,7 +602,7 @@ async function determineNextStep(
     /\b(receita|recipe|bolo|cake|comida|food|piada|joke)\b/i // Clearly off-topic words
   ];
 
-  const hasSuspiciousContent = suspiciousPatterns.some(pattern => pattern.test(userResponse));
+  const hasSuspiciousContent = suspiciousPatterns.some((pattern: any) => pattern.test(userResponse));
 
   if (hasSuspiciousContent) {
     console.log(`🚨 Security: Detected suspicious content in stage ${currentStage}: "${userResponse}"`);
@@ -793,13 +793,13 @@ export const getInterviewStats = query({
   handler: async (ctx) => {
     const sessions = await ctx.db.query("interview_sessions").collect();
     
-    const statsByStage = sessions.reduce((acc, session) => {
+    const statsByStage = sessions.reduce((acc: any, session: any) => {
       acc[session.step] = (acc[session.step] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
 
     const totalSessions = sessions.length;
-    const completedSessions = sessions.filter(s => s.step === "finalizacao").length;
+    const completedSessions = sessions.filter((s: any) => s.step === "finalizacao").length;
     const completionRate = totalSessions > 0 ? (completedSessions / totalSessions) * 100 : 0;
 
     return {

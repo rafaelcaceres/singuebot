@@ -228,7 +228,142 @@ http.route({
       console.error("Error fetching AI interactions:", error);
       return new Response(
         JSON.stringify({ error: "Failed to fetch AI interactions" }),
-        { 
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json" }
+        }
+      );
+    }
+  }),
+});
+
+// API endpoint to search for similar participants (using Convex RAG)
+http.route({
+  path: "/participants/search-similar",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const { participantId, query, limit } = await request.json();
+
+      if (!participantId && !query) {
+        return new Response(
+          JSON.stringify({ error: "Must provide either participantId or query" }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json" }
+          }
+        );
+      }
+
+      const results = await ctx.runAction(internal.functions.participantRAG.searchSimilar, {
+        participantId: participantId || undefined,
+        query: query || undefined,
+        limit: limit || 10,
+      });
+
+      return new Response(JSON.stringify(results), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (error) {
+      console.error("Error searching similar participants:", error);
+      return new Response(
+        JSON.stringify({ error: "Failed to search similar participants" }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json" }
+        }
+      );
+    }
+  }),
+});
+
+// API endpoint to get RAG statistics
+http.route({
+  path: "/participants/rag/stats",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const stats = await ctx.runQuery(api.admin.getParticipantRAGStats);
+
+      return new Response(JSON.stringify(stats), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (error) {
+      console.error("Error fetching RAG stats:", error);
+      return new Response(
+        JSON.stringify({ error: "Failed to fetch RAG stats" }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json" }
+        }
+      );
+    }
+  }),
+});
+
+// API endpoint to add participant to RAG
+http.route({
+  path: "/participants/rag/add",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const { participantId } = await request.json();
+
+      if (!participantId) {
+        return new Response(
+          JSON.stringify({ error: "Missing participantId" }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json" }
+          }
+        );
+      }
+
+      const result = await ctx.runMutation(api.admin.addParticipantToRAG, {
+        participantId,
+      });
+
+      return new Response(JSON.stringify(result), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (error) {
+      console.error("Error adding participant to RAG:", error);
+      return new Response(
+        JSON.stringify({ error: "Failed to add participant to RAG" }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json" }
+        }
+      );
+    }
+  }),
+});
+
+// API endpoint to batch add participants to RAG
+http.route({
+  path: "/participants/rag/batch-add",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const body = await request.json().catch(() => ({}));
+      const { limit } = body;
+
+      const result = await ctx.runMutation(api.admin.batchAddParticipantsToRAG, {
+        limit: limit || undefined,
+      });
+
+      return new Response(JSON.stringify(result), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (error) {
+      console.error("Error batch adding participants to RAG:", error);
+      return new Response(
+        JSON.stringify({ error: "Failed to batch add participants to RAG" }),
+        {
           status: 500,
           headers: { "Content-Type": "application/json" }
         }

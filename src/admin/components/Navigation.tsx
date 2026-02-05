@@ -13,7 +13,9 @@ import {
   Calendar,
   UserCog,
   Phone,
-  BarChart3
+  BarChart3,
+  Sparkles,
+  Network
 } from "lucide-react";
 
 const menuItems = [
@@ -30,9 +32,21 @@ const menuItems = [
     roles: ["owner", "editor", "viewer"]
   },
   {
-    title: "Participantes", 
+    title: "Participantes",
     href: "/participants",
     icon: Users,
+    roles: ["owner", "editor", "viewer"]
+  },
+  {
+    title: "Explorador",
+    href: "/relations",
+    icon: Sparkles,
+    roles: ["owner", "editor", "viewer"]
+  },
+  {
+    title: "Clusters",
+    href: "/clusters",
+    icon: Network,
     roles: ["owner", "editor", "viewer"]
   },
   {

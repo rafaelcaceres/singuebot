@@ -114,7 +114,7 @@ const searchKnowledgeTool = createTool({
           `${index + 1}. ${result.title}\n${result.content}\n(Relevância: ${(result.score * 100).toFixed(1)}%)`
         )
         .join("\n\n");
-      
+
       return `Informações encontradas na base de conhecimento:\n\n${formattedResults}`;
     } catch (error) {
       console.error("Knowledge search error:", error);

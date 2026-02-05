@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation } from 'convex/react';
+import { useNavigate } from 'react-router-dom';
 import {
   useReactTable,
   getCoreRowModel,
@@ -40,6 +41,7 @@ interface Participant {
 const columnHelper = createColumnHelper<Participant>();
 
 export const Participants: React.FC = () => {
+  const navigate = useNavigate();
   const { canManageUsers, canDeleteData } = usePermissions();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -242,10 +244,16 @@ export const Participants: React.FC = () => {
         cell: (info) => (
           <div className="flex space-x-2">
             <button
+              onClick={() => navigate(`/participants/${info.row.original._id}`)}
+              className="text-purple-600 hover:text-purple-800 text-sm font-medium"
+            >
+              Ver Perfil
+            </button>
+            <button
               onClick={() => setSelectedParticipant(info.row.original._id)}
               className="text-blue-600 hover:text-blue-800 text-sm font-medium"
             >
-              Ver conversa
+              Conversa
             </button>
             {canManageUsers && (
               <button
@@ -267,7 +275,7 @@ export const Participants: React.FC = () => {
         ),
       }),
     ],
-    [canDeleteData, canManageUsers, selectedParticipants, isAllSelected, isIndeterminate, handleSelectAll, handleSelectParticipant]
+    [canDeleteData, canManageUsers, selectedParticipants, isAllSelected, isIndeterminate, handleSelectAll, handleSelectParticipant, navigate]
   );
 
   const table = useReactTable({

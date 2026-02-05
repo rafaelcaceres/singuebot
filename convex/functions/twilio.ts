@@ -556,7 +556,7 @@ export const scheduleFollowUp = internalAction({
 function isConsentMessage(body: string): boolean {
   const lowerBody = body.toLowerCase().trim();
   const consentWords = ["sim", "aceito", "concordo", "ok", "yes", "agree"];
-  return consentWords.some(word => lowerBody.includes(word));
+  return consentWords.some((word: any) => lowerBody.includes(word));
 }
 
 async function checkMessageWindow(phoneNumber: string): Promise<{

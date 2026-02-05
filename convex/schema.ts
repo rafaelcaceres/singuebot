@@ -3,7 +3,178 @@ import { v } from "convex/values";
 import { authTables } from "@convex-dev/auth/server";
 
 const applicationTables = {
-  // Enhanced WhatsApp message table with normalized structure
+  // Multi-tenant architecture tables
+  tenants: defineTable({
+    name: v.string(), // Tenant name (e.g., "Singuê", "Pactuá")
+    slug: v.string(), // URL-friendly identifier
+    description: v.optional(v.string()), // Tenant description
+    settings: v.object({
+      timezone: v.string(), // Tenant timezone
+      locale: v.string(), // Default locale (pt-BR, en-US)
+      branding: v.optional(v.object({
+        primaryColor: v.string(),
+        logoUrl: v.optional(v.string()),
+        companyName: v.string(),
+      })),
+    }),
+    isActive: v.boolean(), // Whether tenant is active
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_slug", ["slug"])
+    .index("by_active", ["isActive"])
+    .index("by_created", ["createdAt"]),
+
+  bots: defineTable({
+    tenantId: v.id("tenants"), // Link to tenant
+    name: v.string(), // Bot name (e.g., "Interview Bot", "Billing Bot")
+    type: v.union(
+      v.literal("interview"),
+      v.literal("billing"),
+      v.literal("support"),
+      v.literal("custom")
+    ), // Bot purpose/type
+    description: v.optional(v.string()), // Bot description
+    config: v.object({
+      personality: v.optional(v.string()), // AI personality prompt
+      maxTokens: v.optional(v.number()), // Token limit per response
+      temperature: v.optional(v.number()), // AI creativity setting
+      model: v.optional(v.string()), // AI model to use
+      fallbackMessage: v.optional(v.string()), // Fallback when AI fails
+      enableRAG: v.boolean(), // Whether to use RAG
+      ragNamespace: v.optional(v.string()), // RAG namespace for this bot
+    }),
+    isActive: v.boolean(), // Whether bot is active
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_type", ["type"])
+    .index("by_active", ["isActive"])
+    .index("by_tenant_type", ["tenantId", "type"]),
+
+  channels: defineTable({
+    tenantId: v.id("tenants"), // Link to tenant
+    botId: v.id("bots"), // Link to bot
+    type: v.union(
+      v.literal("whatsapp"),
+      v.literal("telegram"),
+      v.literal("web"),
+      v.literal("api")
+    ), // Channel type
+    name: v.string(), // Channel name
+    config: v.object({
+      // WhatsApp specific config
+      twilioAccountSid: v.optional(v.string()),
+      twilioAuthToken: v.optional(v.string()),
+      twilioPhoneNumber: v.optional(v.string()),
+      
+      // Telegram specific config
+      telegramBotToken: v.optional(v.string()),
+      
+      // Web specific config
+      webOrigins: v.optional(v.array(v.string())),
+      
+      // Generic config
+      webhookUrl: v.optional(v.string()),
+      apiKey: v.optional(v.string()),
+    }),
+    isActive: v.boolean(), // Whether channel is active
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_bot", ["botId"])
+    .index("by_type", ["type"])
+    .index("by_active", ["isActive"])
+    .index("by_tenant_bot", ["tenantId", "botId"]),
+
+  // Generic contact table (replaces whatsappContacts)
+  genericContacts: defineTable({
+    tenantId: v.id("tenants"), // Link to tenant
+    channelId: v.id("channels"), // Link to channel
+    externalId: v.string(), // Channel-specific ID (phone, telegram user ID, etc.)
+    name: v.optional(v.string()), // Contact name
+    metadata: v.optional(v.any()), // Channel-specific metadata
+    lastMessageTime: v.optional(v.number()), // Last message timestamp
+    isActive: v.boolean(), // Whether contact is active
+    createdAt: v.number(),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_channel", ["channelId"])
+    .index("by_external_id", ["externalId"])
+    .index("by_channel_external", ["channelId", "externalId"])
+    .index("by_active", ["isActive"]),
+
+  // Generic conversation table (replaces conversations)
+  genericConversations: defineTable({
+    tenantId: v.id("tenants"), // Link to tenant
+    botId: v.id("bots"), // Link to bot
+    channelId: v.id("channels"), // Link to channel
+    contactId: v.id("genericContacts"), // Link to contact
+    participantId: v.optional(v.id("participants")), // Link to participant (for backward compatibility)
+    threadId: v.optional(v.string()), // AI thread ID
+    state: v.union(
+      v.literal("active"),
+      v.literal("paused"),
+      v.literal("completed"),
+      v.literal("archived")
+    ), // Conversation state
+    context: v.optional(v.any()), // Conversation context/state
+    openedAt: v.number(), // Conversation start
+    lastMessageAt: v.number(), // Last message timestamp
+    closedAt: v.optional(v.number()), // Conversation end
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_bot", ["botId"])
+    .index("by_channel", ["channelId"])
+    .index("by_contact", ["contactId"])
+    .index("by_participant", ["participantId"])
+    .index("by_thread", ["threadId"])
+    .index("by_state", ["state"])
+    .index("by_last_message", ["lastMessageAt"]),
+
+  // Generic message table (replaces whatsappMessages)
+  genericMessages: defineTable({
+    tenantId: v.id("tenants"), // Link to tenant
+    conversationId: v.id("genericConversations"), // Link to conversation
+    externalId: v.optional(v.string()), // Channel-specific message ID
+    direction: v.union(v.literal("inbound"), v.literal("outbound")), // Message direction
+    content: v.object({
+      text: v.optional(v.string()), // Text content
+      mediaUrl: v.optional(v.string()), // Media URL
+      mediaType: v.optional(v.string()), // Media content type
+      metadata: v.optional(v.any()), // Channel-specific metadata
+    }),
+    status: v.union(
+      v.literal("received"),
+      v.literal("processing"),
+      v.literal("sent"),
+      v.literal("delivered"),
+      v.literal("read"),
+      v.literal("failed")
+    ), // Message status
+    aiMetadata: v.optional(v.object({
+      model: v.string(),
+      tokens: v.number(),
+      processingTimeMs: v.number(),
+      fallbackUsed: v.boolean(),
+      timestamp: v.number(),
+      threadId: v.optional(v.string()),
+      context: v.optional(v.any()), // AI context snapshot
+    })),
+    rawData: v.optional(v.any()), // Raw channel data (Twilio, Telegram, etc.)
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_conversation", ["conversationId"])
+    .index("by_external_id", ["externalId"])
+    .index("by_direction", ["direction"])
+    .index("by_status", ["status"])
+    .index("by_created", ["createdAt"]),
+
+  // Enhanced WhatsApp message table with normalized structure (LEGACY - for backward compatibility)
   whatsappMessages: defineTable({
     messageId: v.string(), // Twilio message SID
     body: v.string(), // Message content
@@ -188,6 +359,10 @@ const applicationTables = {
   })
     .index("by_participant", ["participantId"]),
 
+  // Note: Participant embeddings are now managed by Convex RAG (@convex-dev/rag)
+  // See convex/functions/participantRAG.ts for implementation
+  // This eliminates ~500 lines of custom vector search code
+
   templates: defineTable({
     name: v.string(), // Template friendly name
     locale: v.string(), // Language/locale (pt-BR, en-US)
@@ -218,19 +393,30 @@ const applicationTables = {
     .index("by_stage", ["stage"])
     .index("by_twilio_id", ["twilioId"]),
 
+  // Enhanced knowledge_docs table with tenant/bot isolation
   knowledge_docs: defineTable({
+    tenantId: v.optional(v.id("tenants")), // Link to tenant (optional for backward compatibility)
+    botId: v.optional(v.id("bots")), // Link to bot (optional for backward compatibility)
+    namespace: v.optional(v.string()), // RAG namespace (for multi-tenant isolation)
     title: v.string(), // Document title
     source: v.string(), // Source file/URL
     tags: v.array(v.string()), // Document tags
     status: v.union(v.literal("ingested"), v.literal("pending"), v.literal("failed")), // Processing status
     createdAt: v.number(), // Upload timestamp
   })
+    .index("by_tenant", ["tenantId"])
+    .index("by_bot", ["botId"])
+    .index("by_namespace", ["namespace"])
     .index("by_status", ["status"])
     .index("by_created", ["createdAt"])
-    .index("by_tags", ["tags"]),
+    .index("by_tags", ["tags"])
+    .index("by_tenant_bot", ["tenantId", "botId"]),
 
   knowledge_chunks: defineTable({
     docId: v.id("knowledge_docs"), // Link to source document
+    tenantId: v.optional(v.id("tenants")), // Link to tenant (denormalized for performance)
+    botId: v.optional(v.id("bots")), // Link to bot (denormalized for performance)
+    namespace: v.optional(v.string()), // RAG namespace (denormalized for performance)
     chunk: v.string(), // Text chunk content
     embedding: v.array(v.float64()), // Vector embedding
     tags: v.object({
@@ -240,9 +426,13 @@ const applicationTables = {
     }),
   })
     .index("by_doc", ["docId"])
-    .vectorIndex("by_embedding", {
+    .index("by_tenant", ["tenantId"])
+    .index("by_bot", ["botId"])
+    .index("by_namespace", ["namespace"])
+    .vectorIndex("by_namespace_embedding", {
       vectorField: "embedding",
       dimensions: 3072, // text-embedding-3-large dimensions
+      filterFields: ["namespace"],
     }),
 
   clusters: defineTable({
@@ -251,6 +441,43 @@ const applicationTables = {
     rules: v.optional(v.any()), // Clustering rules (JSON)
   })
     .index("by_name", ["name"]),
+
+  // Cache for UMAP reduced embeddings
+  umap_embeddings_cache: defineTable({
+    participantId: v.id("participants"),
+    x: v.float64(), // UMAP-2D coordinate X (for visualization)
+    y: v.float64(), // UMAP-2D coordinate Y (for visualization)
+    embedding: v.array(v.float64()), // Original embedding (1536D)
+    clusteringEmbedding: v.optional(v.array(v.float64())), // UMAP-50D for clustering (preserves more info) - optional for migration
+    metadata: v.object({
+      name: v.optional(v.string()),
+      cargo: v.optional(v.string()),
+      empresa: v.optional(v.string()),
+      setor: v.optional(v.string()),
+      programaMarca: v.optional(v.string()),
+    }),
+    version: v.string(), // Cache version (para invalidar quando necessário)
+    createdAt: v.number(),
+  })
+    .index("by_participant", ["participantId"])
+    .index("by_version", ["version"])
+    .index("by_created", ["createdAt"]),
+
+  // Cache for clustering results (to avoid recalculating on every page load)
+  cluster_results_cache: defineTable({
+    points: v.any(), // Array of cluster points (compressed JSON)
+    clusterStats: v.any(), // Array of cluster statistics
+    totalParticipants: v.number(),
+    parameters: v.object({
+      minClusterSize: v.number(),
+      minSamples: v.number(),
+    }),
+    umapCacheVersion: v.string(), // Link to UMAP cache version used
+    createdAt: v.number(),
+    expiresAt: v.optional(v.number()), // Optional TTL for cache invalidation
+  })
+    .index("by_created", ["createdAt"])
+    .index("by_umap_version", ["umapCacheVersion"]),
 
   content_blocks: defineTable({
     stage: v.string(), // Interview stage

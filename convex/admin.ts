@@ -324,6 +324,20 @@ export const getParticipantById = query({
   },
 });
 
+export const getParticipantProfileById = query({
+  args: {
+    participantId: v.id("participants"),
+  },
+  handler: async (ctx, args) => {
+    const profile = await ctx.db
+      .query("participant_profiles")
+      .withIndex("by_participant", (q) => q.eq("participantId", args.participantId))
+      .first();
+
+    return profile;
+  },
+});
+
 export const createParticipant = mutation({
   args: {
     phone: v.string(),
@@ -370,6 +384,11 @@ export const createParticipant = mutation({
     // Create initial conversation for the participant
     await getOrCreateConversation(ctx, participantId);
 
+    // Add participant to RAG for semantic search
+    await ctx.scheduler.runAfter(0, internal.functions.participantRAG.addParticipant, {
+      participantId,
+    });
+
     return participantId;
   },
 });
@@ -396,6 +415,16 @@ export const updateParticipant = mutation({
 
     // Update participant
     await ctx.db.patch(args.participantId, args.updates);
+
+    // Update participant in RAG if relevant fields changed
+    const relevantFields = ['name', 'cargo', 'empresa', 'setor'];
+    const hasRelevantChanges = relevantFields.some(field => field in args.updates);
+
+    if (hasRelevantChanges) {
+      await ctx.scheduler.runAfter(0, internal.functions.participantRAG.updateParticipant, {
+        participantId: args.participantId,
+      });
+    }
 
     return args.participantId;
   },
@@ -442,6 +471,21 @@ export const deleteParticipant = mutation({
     for (const session of interviewSessions) {
       await ctx.db.delete(session._id);
     }
+
+    // Delete participant profile
+    const profile = await ctx.db
+      .query("participant_profiles")
+      .withIndex("by_participant", (q) => q.eq("participantId", args.participantId))
+      .first();
+
+    if (profile) {
+      await ctx.db.delete(profile._id);
+    }
+
+    // Remove participant from RAG
+    await ctx.scheduler.runAfter(0, internal.functions.participantRAG.removeParticipant, {
+      participantId: args.participantId,
+    });
 
     // Finally delete the participant
     await ctx.db.delete(args.participantId);
@@ -1087,5 +1131,62 @@ export const getProcessingJobs = query({
       progress: 50, // Placeholder progress
       currentStep: "Processando chunks...",
     }));
+  },
+});
+
+// Participant RAG Management (using @convex-dev/rag)
+
+export const getParticipantRAGStats = query({
+  args: {},
+  handler: async (ctx): Promise<any> => {
+    return await ctx.runQuery(internal.functions.participantRAG.getStats);
+  },
+});
+
+export const addParticipantToRAG = mutation({
+  args: {
+    participantId: v.id("participants"),
+  },
+  handler: async (ctx, args) => {
+    await ctx.scheduler.runAfter(0, internal.functions.participantRAG.addParticipant, {
+      participantId: args.participantId,
+    });
+
+    return { success: true, message: "Participant RAG indexing scheduled" };
+  },
+});
+
+export const batchAddParticipantsToRAG = mutation({
+  args: {
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    await ctx.scheduler.runAfter(0, internal.functions.participantRAG.batchAddParticipants, {
+      limit: args.limit,
+    });
+
+    return { success: true, message: "Batch RAG indexing scheduled" };
+  },
+});
+
+// 🚀 Public action for easy dashboard/CLI indexing
+export const indexAllParticipants = mutation({
+  args: {
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limitText = args.limit ? `${args.limit}` : 'all';
+    console.log(`🚀 Starting indexing of ${limitText} participants...`);
+
+    await ctx.scheduler.runAfter(0, internal.functions.participantRAG.batchAddParticipants, {
+      limit: args.limit,
+    });
+
+    return {
+      success: true,
+      message: `Indexing scheduled for ${limitText} participants. Check logs for progress.`,
+      instructions: "Monitor progress in Convex Dashboard > Logs",
+      dashboardUrl: "https://dashboard.convex.dev/d/neighborly-ibex-402"
+    };
   },
 });

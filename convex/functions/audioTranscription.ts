@@ -148,5 +148,5 @@ export const isAudioMessage = (mediaContentType?: string): boolean => {
     "audio/amr",
   ];
   
-  return audioTypes.some(type => mediaContentType.toLowerCase().includes(type));
+  return audioTypes.some((type: any) => mediaContentType.toLowerCase().includes(type));
 };

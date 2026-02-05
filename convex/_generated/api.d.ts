@@ -8,15 +8,23 @@
  * @module
  */
 
+import type * as adapters_registry from "../adapters/registry.js";
+import type * as adapters_whatsapp from "../adapters/whatsapp.js";
 import type * as admin from "../admin.js";
 import type * as agents from "../agents.js";
 import type * as analytics from "../analytics.js";
 import type * as analytics_optimized from "../analytics_optimized.js";
 import type * as auth from "../auth.js";
 import type * as createAdminUser from "../createAdminUser.js";
+import type * as crons from "../crons.js";
 import type * as debug from "../debug.js";
+import type * as functions_ai from "../functions/ai.js";
 import type * as functions_audioTranscription from "../functions/audioTranscription.js";
+import type * as functions_channels from "../functions/channels.js";
+import type * as functions_genericRAG from "../functions/genericRAG.js";
 import type * as functions_interview from "../functions/interview.js";
+import type * as functions_messages from "../functions/messages.js";
+import type * as functions_participantRAG from "../functions/participantRAG.js";
 import type * as functions_participant_queries from "../functions/participant_queries.js";
 import type * as functions_rag from "../functions/rag.js";
 import type * as functions_templateConfig from "../functions/templateConfig.js";
@@ -24,10 +32,14 @@ import type * as functions_twilio from "../functions/twilio.js";
 import type * as functions_twilio_db from "../functions/twilio_db.js";
 import type * as http from "../http.js";
 import type * as migrations_consolidateParticipants from "../migrations/consolidateParticipants.js";
+import type * as migrations_migrateToGenericSystem from "../migrations/migrateToGenericSystem.js";
+import type * as migrations_runMigration from "../migrations/runMigration.js";
 import type * as router from "../router.js";
+import type * as routers_generic from "../routers/generic.js";
 import type * as seed from "../seed.js";
 import type * as test_phoneNormalizationTest from "../test/phoneNormalizationTest.js";
 import type * as threadManager from "../threadManager.js";
+import type * as types_channels from "../types/channels.js";
 import type * as utils_participantSearch from "../utils/participantSearch.js";
 import type * as utils_phoneNormalizer from "../utils/phoneNormalizer.js";
 import type * as whatsapp from "../whatsapp.js";
@@ -47,15 +59,23 @@ import type {
  * ```
  */
 declare const fullApi: ApiFromModules<{
+  "adapters/registry": typeof adapters_registry;
+  "adapters/whatsapp": typeof adapters_whatsapp;
   admin: typeof admin;
   agents: typeof agents;
   analytics: typeof analytics;
   analytics_optimized: typeof analytics_optimized;
   auth: typeof auth;
   createAdminUser: typeof createAdminUser;
+  crons: typeof crons;
   debug: typeof debug;
+  "functions/ai": typeof functions_ai;
   "functions/audioTranscription": typeof functions_audioTranscription;
+  "functions/channels": typeof functions_channels;
+  "functions/genericRAG": typeof functions_genericRAG;
   "functions/interview": typeof functions_interview;
+  "functions/messages": typeof functions_messages;
+  "functions/participantRAG": typeof functions_participantRAG;
   "functions/participant_queries": typeof functions_participant_queries;
   "functions/rag": typeof functions_rag;
   "functions/templateConfig": typeof functions_templateConfig;
@@ -63,10 +83,14 @@ declare const fullApi: ApiFromModules<{
   "functions/twilio_db": typeof functions_twilio_db;
   http: typeof http;
   "migrations/consolidateParticipants": typeof migrations_consolidateParticipants;
+  "migrations/migrateToGenericSystem": typeof migrations_migrateToGenericSystem;
+  "migrations/runMigration": typeof migrations_runMigration;
   router: typeof router;
+  "routers/generic": typeof routers_generic;
   seed: typeof seed;
   "test/phoneNormalizationTest": typeof test_phoneNormalizationTest;
   threadManager: typeof threadManager;
+  "types/channels": typeof types_channels;
   "utils/participantSearch": typeof utils_participantSearch;
   "utils/phoneNormalizer": typeof utils_phoneNormalizer;
   whatsapp: typeof whatsapp;

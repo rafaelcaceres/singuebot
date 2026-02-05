@@ -69,12 +69,13 @@ export const getParticipantsByEmpresaSetor = query({
  */
 export const getUniqueEmpresas = query({
   args: {},
+  returns: v.array(v.string()),
   handler: async (ctx) => {
     const participants = await ctx.db.query("participants").collect();
     const empresas = new Set(
       participants
-        .map(p => p.empresa)
-        .filter(empresa => empresa !== undefined && empresa !== null && empresa.trim() !== "")
+        .map((p: any) => p.empresa)
+        .filter((empresa: any) => empresa !== undefined && empresa !== null && empresa.trim() !== "")
     );
     return Array.from(empresas).sort();
   },
@@ -85,12 +86,13 @@ export const getUniqueEmpresas = query({
  */
 export const getUniqueSetores = query({
   args: {},
+  returns: v.array(v.string()),
   handler: async (ctx) => {
     const participants = await ctx.db.query("participants").collect();
     const setores = new Set(
       participants
-        .map(p => p.setor)
-        .filter(setor => setor !== undefined && setor !== null && setor.trim() !== "")
+        .map((p: any) => p.setor)
+        .filter((setor: any) => setor !== undefined && setor !== null && setor.trim() !== "")
     );
     return Array.from(setores).sort();
   },
@@ -101,12 +103,13 @@ export const getUniqueSetores = query({
  */
 export const getUniqueCargos = query({
   args: {},
+  returns: v.array(v.string()),
   handler: async (ctx) => {
     const participants = await ctx.db.query("participants").collect();
     const cargos = new Set(
       participants
-        .map(p => p.cargo)
-        .filter(cargo => cargo !== undefined && cargo !== null && cargo.trim() !== "")
+        .map((p: any) => p.cargo)
+        .filter((cargo: any) => cargo !== undefined && cargo !== null && cargo.trim() !== "")
     );
     return Array.from(cargos).sort();
   },
@@ -127,7 +130,7 @@ export const updateParticipantProfessionalInfo = mutation({
     
     // Filter out undefined values
     const filteredUpdates = Object.fromEntries(
-      Object.entries(updates).filter(([_, value]) => value !== undefined)
+      Object.entries(updates).filter(([_, value]: [string, any]) => value !== undefined)
     );
     
     if (Object.keys(filteredUpdates).length > 0) {
@@ -153,25 +156,25 @@ export const searchParticipants = query({
     
     // Apply filters
     if (args.cargo) {
-      participants = participants.filter(p => 
+      participants = participants.filter((p: any) => 
         p.cargo?.toLowerCase().includes(args.cargo!.toLowerCase())
       );
     }
     
     if (args.empresa) {
-      participants = participants.filter(p => 
+      participants = participants.filter((p: any) => 
         p.empresa?.toLowerCase().includes(args.empresa!.toLowerCase())
       );
     }
     
     if (args.setor) {
-      participants = participants.filter(p => 
+      participants = participants.filter((p: any) => 
         p.setor?.toLowerCase().includes(args.setor!.toLowerCase())
       );
     }
     
     if (args.name) {
-      participants = participants.filter(p => 
+      participants = participants.filter((p: any) => 
         p.name?.toLowerCase().includes(args.name!.toLowerCase())
       );
     }

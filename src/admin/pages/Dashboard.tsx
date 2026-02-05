@@ -4,10 +4,10 @@ import { api } from "../../../convex/_generated/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { 
-  Users, 
-  MessageSquare, 
-  TrendingUp, 
+import {
+  Users,
+  MessageSquare,
+  TrendingUp,
   Clock,
   Brain,
   FileText,
@@ -21,7 +21,8 @@ import {
   Globe,
   Settings,
   Download,
-  Filter
+  Filter,
+  Sparkles
 } from "lucide-react";
 import {
   LineChart,
@@ -87,6 +88,7 @@ export default function Dashboard() {
   const systemHealth = useQuery(api.analytics.getSystemHealth);
   const topParticipants = useQuery(api.analytics.getTopParticipants, { limit: 5 });
   const recentActivity = useQuery(api.analytics.getRecentActivity, { limit: 10 });
+  const ragStats = useQuery(api.functions.participantRAG.getRAGStats);
 
   console.log("Query results:", {
     realTimeMetrics,
@@ -272,7 +274,7 @@ export default function Dashboard() {
       )}
 
       {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         <KPICard
           title="Total Participants"
           value={metrics.participants.total.toLocaleString()}
@@ -293,6 +295,13 @@ export default function Dashboard() {
           description="AI responses today"
           icon={<Brain className="h-6 w-6" />}
           trend="up"
+        />
+        <KPICard
+          title="RAG Embeddings"
+          value={ragStats?.totalParticipants.toLocaleString() || "0"}
+          description="Semantic search enabled"
+          icon={<Sparkles className="h-6 w-6" />}
+          trend="neutral"
         />
         <KPICard
           title="Consent Rate"
