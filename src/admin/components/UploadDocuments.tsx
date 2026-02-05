@@ -16,7 +16,11 @@ interface UploadFile {
   error?: string;
 }
 
-const UploadDocuments: React.FC = () => {
+interface UploadDocumentsProps {
+  namespace?: string;
+}
+
+const UploadDocuments: React.FC<UploadDocumentsProps> = ({ namespace }) => {
   const [uploadFiles, setUploadFiles] = useState<UploadFile[]>([]);
   const uploadDocument = useMutation(api.admin.uploadKnowledgeDocument);
   const { toast } = useToast();
@@ -78,7 +82,7 @@ const UploadDocuments: React.FC = () => {
           : f
       ));
 
-      // Upload to Convex
+      // Upload to Convex with namespace
       await uploadDocument({
         title: uploadFile.file.name,
         source: `upload:${uploadFile.file.name}`,
@@ -86,6 +90,7 @@ const UploadDocuments: React.FC = () => {
         content,
         format: format || 'txt',
         hash,
+        namespace,
       });
 
       setUploadFiles(prev => prev.map(f => 

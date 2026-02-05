@@ -80,15 +80,20 @@ export default function Dashboard() {
 
   console.log("Dashboard component rendering...");
 
+  // Feature flags
+  const featureFlags = useQuery(api.functions.botConfig.getFeatureFlags);
+  const interviewEnabled = featureFlags?.enableInterview ?? false;
+  const participantRAGEnabled = featureFlags?.enableParticipantRAG ?? false;
+
   // Enhanced data fetching with new analytics
   const realTimeMetrics = useQuery(api.analytics.getRealTimeMetrics);
   const messageVolumeChart = useQuery(api.analytics.getMessageVolumeChart, { days: timeRange === "7d" ? 7 : timeRange === "30d" ? 30 : 90 });
-  const participantGrowthChart = useQuery(api.analytics.getParticipantGrowthChart, { days: timeRange === "7d" ? 7 : timeRange === "30d" ? 30 : 90 });
-  const interviewAnalytics = useQuery(api.analytics.getInterviewAnalytics);
+  const participantGrowthChart = useQuery(api.analytics.getParticipantGrowthChart, interviewEnabled ? { days: timeRange === "7d" ? 7 : timeRange === "30d" ? 30 : 90 } : "skip");
+  const interviewAnalytics = useQuery(api.analytics.getInterviewAnalytics, interviewEnabled ? {} : "skip");
   const systemHealth = useQuery(api.analytics.getSystemHealth);
-  const topParticipants = useQuery(api.analytics.getTopParticipants, { limit: 5 });
+  const topParticipants = useQuery(api.analytics.getTopParticipants, interviewEnabled ? { limit: 5 } : "skip");
   const recentActivity = useQuery(api.analytics.getRecentActivity, { limit: 10 });
-  const ragStats = useQuery(api.functions.participantRAG.getRAGStats);
+  const ragStats = useQuery(api.functions.participantRAG.getRAGStats, participantRAGEnabled ? undefined : "skip");
 
   console.log("Query results:", {
     realTimeMetrics,
@@ -352,8 +357,8 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Participant Growth Chart */}
-        <Card>
+        {/* Participant Growth Chart - only when interview is enabled */}
+        {interviewEnabled && <Card>
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <TrendingUp className="h-5 w-5" />
@@ -379,12 +384,13 @@ export default function Dashboard() {
               </ResponsiveContainer>
             </div>
           </CardContent>
-        </Card>
+        </Card>}
       </div>
 
       {/* Interview Analytics & System Health */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Interview Funnel */}
+        {/* Interview Funnel - only when interview is enabled */}
+        {interviewEnabled && (
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
@@ -420,6 +426,7 @@ export default function Dashboard() {
             </div>
           </CardContent>
         </Card>
+        )}
 
         {/* System Health */}
         <Card>
@@ -517,7 +524,8 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Top Participants */}
+        {/* Top Participants - only when interview is enabled */}
+        {interviewEnabled && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
@@ -554,6 +562,7 @@ export default function Dashboard() {
             </div>
           </CardContent>
         </Card>
+        )}
       </div>
 
       {/* Knowledge Base Status */}

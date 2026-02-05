@@ -20,6 +20,7 @@ import type * as crons from "../crons.js";
 import type * as debug from "../debug.js";
 import type * as functions_ai from "../functions/ai.js";
 import type * as functions_audioTranscription from "../functions/audioTranscription.js";
+import type * as functions_botConfig from "../functions/botConfig.js";
 import type * as functions_channels from "../functions/channels.js";
 import type * as functions_genericRAG from "../functions/genericRAG.js";
 import type * as functions_interview from "../functions/interview.js";
@@ -71,6 +72,7 @@ declare const fullApi: ApiFromModules<{
   debug: typeof debug;
   "functions/ai": typeof functions_ai;
   "functions/audioTranscription": typeof functions_audioTranscription;
+  "functions/botConfig": typeof functions_botConfig;
   "functions/channels": typeof functions_channels;
   "functions/genericRAG": typeof functions_genericRAG;
   "functions/interview": typeof functions_interview;

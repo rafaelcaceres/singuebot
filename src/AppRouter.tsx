@@ -14,6 +14,7 @@ import DashboardParticipants from "./admin/pages/DashboardParticipants";
 import { ParticipantExplorer } from "./admin/pages/ParticipantExplorer";
 import { ParticipantProfile } from "./admin/pages/ParticipantProfile";
 import { ParticipantClusters } from "./admin/pages/ParticipantClusters";
+import { SettingsPage } from "./admin/pages/SettingsPage";
 
 function ImportPage() {
   return <div className="p-8">Importar CSV - Em desenvolvimento</div>;
@@ -21,10 +22,6 @@ function ImportPage() {
 
 function JobsPage() {
   return <div className="p-8">Jobs & Logs - Em desenvolvimento</div>;
-}
-
-function SettingsPage() {
-  return <div className="p-8">Configurações - Em desenvolvimento</div>;
 }
 
 // Component to handle authentication redirects

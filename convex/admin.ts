@@ -887,20 +887,33 @@ export const getClusters = query({
 // Knowledge Management Functions
 
 export const getKnowledgeDocuments = query({
-  args: {},
-  handler: async (ctx) => {
-    const documents = await ctx.db
-      .query("knowledge_docs")
-      .withIndex("by_created")
-      .order("desc")
-      .collect();
-    
+  args: {
+    namespace: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    let documents;
+
+    if (args.namespace) {
+      documents = await ctx.db
+        .query("knowledge_docs")
+        .withIndex("by_namespace", (q) => q.eq("namespace", args.namespace!))
+        .order("desc")
+        .collect();
+    } else {
+      documents = await ctx.db
+        .query("knowledge_docs")
+        .withIndex("by_created")
+        .order("desc")
+        .collect();
+    }
+
     return documents.map(doc => ({
       _id: doc._id,
       title: doc.title,
       source: doc.source,
       status: doc.status,
       tags: doc.tags,
+      namespace: doc.namespace,
       uploadedAt: doc._creationTime,
       createdAt: doc.createdAt,
     }));
@@ -949,9 +962,14 @@ export const updateKnowledgeDocument = mutation({
 });
 
 export const getKnowledgeDocumentStats = query({
-  args: {},
-  handler: async (ctx) => {
-    const documents = await ctx.db.query("knowledge_docs").collect();
+  args: {
+    namespace: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    let documents = await ctx.db.query("knowledge_docs").collect();
+    if (args.namespace) {
+      documents = documents.filter(doc => doc.namespace === args.namespace);
+    }
     
     const stats = {
       total: documents.length,
@@ -973,13 +991,17 @@ export const uploadKnowledgeDocument = mutation({
     content: v.string(),
     format: v.union(v.literal("pdf"), v.literal("txt"), v.literal("md")),
     hash: v.string(),
+    namespace: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    // Insert document record
+    const namespace = args.namespace || "global_knowledge";
+
+    // Insert document record with namespace
     const documentId = await ctx.db.insert("knowledge_docs", {
       title: args.title,
       source: args.source,
       tags: args.tags,
+      namespace,
       status: "pending",
       createdAt: Date.now(),
     });
@@ -991,6 +1013,7 @@ export const uploadKnowledgeDocument = mutation({
       title: args.title,
       format: args.format,
       hash: args.hash,
+      namespace,
     });
 
     return documentId;
@@ -1005,12 +1028,15 @@ export const processDocumentForRAG = internalAction({
     title: v.string(),
     format: v.union(v.literal("pdf"), v.literal("txt"), v.literal("md")),
     hash: v.string(),
+    namespace: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     try {
+      const namespace = args.namespace || "global_knowledge";
+
       // Process document with RAG system directly
       const result = await rag.add(ctx, {
-        namespace: "global_knowledge",
+        namespace,
         title: args.title,
         contentHash: args.hash,
         text: args.content,

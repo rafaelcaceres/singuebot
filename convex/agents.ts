@@ -509,6 +509,74 @@ const securityFilterTool = createTool({
   }
 });
 
+// Generic namespace-aware RAG search tool (for non-interview bots)
+const genericSearchKnowledgeTool = createTool({
+  description: "Search the knowledge base for relevant information to answer the user's question. Always use this tool before answering to ensure accuracy.",
+  args: z.object({
+    query: z.string().describe("Search query for relevant knowledge"),
+    limit: z.optional(z.number()).describe("Maximum number of results (default: 5)"),
+  }),
+  handler: async (ctx, args): Promise<string> => {
+    try {
+      // Get active bot config to determine namespace
+      const botConfig: any = await ctx.runQuery(internal.functions.botConfig.getActiveBotConfig);
+      const ragNamespace: string = botConfig?.config?.ragNamespace || "global_knowledge";
+
+      // Derive tenantSlug and botName from namespace or bot config
+      const tenantSlug = botConfig?.tenant?.slug || ragNamespace.split("_")[0] || "global";
+      const botName = botConfig?.name || "default";
+
+      const results = await ctx.runAction(internal.functions.genericRAG.searchKnowledgeForBot, {
+        tenantSlug,
+        botName,
+        query: args.query,
+        limit: args.limit || 5,
+      });
+
+      if (results.length === 0) {
+        return "Nenhuma informação relevante encontrada na base de conhecimento.";
+      }
+
+      return results
+        .map((result: any, index: number) =>
+          `${index + 1}. ${result.title}\n${result.content}\n(Relevância: ${(result.score * 100).toFixed(1)}%)`
+        )
+        .join("\n\n");
+    } catch (error) {
+      console.error("Generic knowledge search error:", error);
+      return "Erro ao buscar informações na base de conhecimento.";
+    }
+  },
+});
+
+// Generic configurable agent (for RAG-only / support bots)
+export const genericAgent = new Agent(components.agent, {
+  name: "GenericAssistant",
+  instructions: "Você é um assistente virtual configurável. Siga rigorosamente as instruções de personalidade e guardrails fornecidas no contexto da conversa.",
+  tools: {
+    searchKnowledge: genericSearchKnowledgeTool,
+    securityFilter: securityFilterTool,
+  },
+  ...sharedDefaults,
+});
+
+// Helper to build the system prompt for generic (RAG-only) bots
+function buildSystemPrompt(personality: string, guardrails: string, ragContext: string): string {
+  let prompt = personality;
+
+  if (guardrails) {
+    prompt += `\n\n${guardrails}`;
+  }
+
+  if (ragContext) {
+    prompt += `\n\n--- INFORMAÇÕES DA BASE DE CONHECIMENTO ---\n${ragContext}\n--- FIM DAS INFORMAÇÕES ---\n\nUse APENAS as informações acima para responder. Se a pergunta não pode ser respondida com essas informações, diga que não encontrou a informação e sugira que o usuário entre em contato com o canal apropriado.`;
+  } else {
+    prompt += `\n\nNenhuma informação relevante foi encontrada na base de conhecimento para esta pergunta. Informe ao usuário que você não possui essa informação e sugira que ele entre em contato com o canal apropriado.`;
+  }
+
+  return prompt;
+}
+
 // Interview Agent
 export const interviewAgent = new Agent(components.agent, {
   name: "Fabi",
@@ -645,6 +713,112 @@ export const getAIInteractions = query({
   },
 });
 
+// RAG-only response for generic/support bots (no interview flow)
+export const ragOnlyResponse = internalAction({
+  args: {
+    participantId: v.id("participants"),
+    text: v.string(),
+    messageId: v.string(),
+  },
+  returns: v.string(),
+  handler: async (ctx, args): Promise<string> => {
+    const startTime = Date.now();
+    const DEFAULT_FALLBACK = "Desculpe, não consegui encontrar essa informação.";
+
+    // 1. Get bot configuration
+    const botConfig: any = await ctx.runQuery(internal.functions.botConfig.getActiveBotConfig);
+    const personality: string = botConfig?.config?.personality || "Você é um assistente virtual prestativo.";
+    const guardrails: string = botConfig?.config?.guardrailsPrompt || "";
+    const fallbackMessage: string = botConfig?.config?.fallbackMessage || DEFAULT_FALLBACK;
+    const tenantSlug: string = botConfig?.tenant?.slug || "global";
+    const botName: string = botConfig?.name || "default";
+
+    // 2. Search RAG for relevant context
+    let ragContext = "";
+    if (botConfig?.config?.enableRAG !== false) {
+      try {
+        const ragResults = await ctx.runAction(internal.functions.genericRAG.searchKnowledgeForBot, {
+          tenantSlug,
+          botName,
+          query: args.text,
+          limit: 5,
+        });
+
+        if (ragResults.length > 0) {
+          ragContext = ragResults
+            .map((r: any, i: number) => `[${i + 1}] ${r.title}: ${r.content}`)
+            .join("\n\n");
+        }
+      } catch (error) {
+        console.error("RAG search error:", error);
+      }
+    }
+
+    // 3. Build system prompt with guardrails
+    const systemPrompt = buildSystemPrompt(personality, guardrails, ragContext);
+
+    // 4. Get or create thread for conversation continuity
+    const participant = await ctx.runQuery(internal.functions.twilio_db.getParticipant, {
+      participantId: args.participantId,
+    });
+
+    let currentThreadId = participant?.threadId;
+    let threadResult;
+
+    try {
+      if (currentThreadId) {
+        threadResult = await genericAgent.continueThread(ctx, { threadId: currentThreadId });
+      } else {
+        threadResult = await genericAgent.createThread(ctx, {});
+        currentThreadId = threadResult.thread.threadId;
+        await ctx.runMutation(internal.functions.twilio_db.updateParticipantThreadId, {
+          participantId: args.participantId,
+          threadId: currentThreadId,
+        });
+      }
+    } catch (error) {
+      console.error("Thread error, creating new one:", error);
+      threadResult = await genericAgent.createThread(ctx, {});
+      currentThreadId = threadResult.thread.threadId;
+      await ctx.runMutation(internal.functions.twilio_db.updateParticipantThreadId, {
+        participantId: args.participantId,
+        threadId: currentThreadId,
+      });
+    }
+
+    const { thread } = threadResult;
+
+    // 5. Generate response
+    try {
+      const result = await thread.generateText(
+        {
+          prompt: args.text,
+          messages: [
+            { role: "system", content: systemPrompt },
+          ],
+        },
+        {
+          contextOptions: {
+            recentMessages: 10,
+          },
+          storageOptions: {
+            saveMessages: "all",
+          },
+        }
+      );
+
+      const response = result.text?.trim();
+      if (!response) return fallbackMessage;
+
+      console.log(`Generic bot response generated in ${Date.now() - startTime}ms`);
+      return response;
+    } catch (error) {
+      console.error("Generic agent response error:", error);
+      return fallbackMessage;
+    }
+  },
+});
+
 // Modern AI processing using Convex Agent framework
 export const processIncomingMessage = internalAction({
   args: {
@@ -658,35 +832,49 @@ export const processIncomingMessage = internalAction({
     console.log("🤖 AI Agent: Processing incoming message:", args);
 
     try {
+      // Get bot configuration to determine routing
+      const botConfig = await ctx.runQuery(internal.functions.botConfig.getActiveBotConfig);
+      const enableInterview = botConfig?.config?.enableInterview ?? false;
+
       // Get or create participant using the existing function
       const participant = await ctx.runMutation(internal.functions.twilio_db.getOrCreateParticipant, {
         phone: args.from,
       });
 
-      if (participant) {
-        console.log("🎯 FIB Interview: Found/created participant, using interview stage progression system");
+      if (!participant) {
+        console.error("🤖 AI Agent: Failed to get or create participant");
+        await ctx.runAction(api.whatsapp.sendMessage, {
+          to: args.from,
+          body: "Desculpe, houve um problema técnico. Tente novamente em alguns instantes.",
+        });
+        return null;
+      }
 
-        // Use the proper interview system with stage progression
+      let responseText: string;
+
+      if (enableInterview) {
+        // === INTERVIEW FLOW (FIB) ===
+        console.log("🎯 Interview: Using interview stage progression system");
+
         const result = await ctx.runAction(internal.functions.interview.handleInbound, {
           participantId: participant._id,
           text: args.body,
           messageId: args.messageId,
         });
 
-        console.log("🎯 FIB Interview: Interview system response:", result);
+        responseText = result.response;
 
-        // Send the response
-        if (result.response) {
+        if (responseText) {
           await ctx.runAction(api.whatsapp.sendMessage, {
             to: args.from,
-            body: result.response,
+            body: responseText,
           });
 
-          // Log the AI interaction with proper data
+          // Log the AI interaction
           const startTime = Date.now();
           const messageDoc = await ctx.runQuery(api.whatsapp.getMessagesByParticipant, {
             participantId: participant._id,
-            limit: 1
+            limit: 1,
           });
 
           if (messageDoc && messageDoc.messages.length > 0) {
@@ -694,7 +882,7 @@ export const processIncomingMessage = internalAction({
               messageId: messageDoc.messages[0]._id,
               aiMetadata: {
                 model: "gpt-4o-mini",
-                tokens: ('usageTotalTokens' in result) ? (result.usageTotalTokens ?? 0) : 0,
+                tokens: ("usageTotalTokens" in result) ? (result.usageTotalTokens ?? 0) : 0,
                 processingTimeMs: Date.now() - startTime,
                 fallbackUsed: false,
                 timestamp: Date.now(),
@@ -703,32 +891,54 @@ export const processIncomingMessage = internalAction({
             });
           }
 
-          console.log(`🎯 FIB Interview: Successfully processed message. Next stage: ${result.nextStage || 'same'}`);
+          console.log(`🎯 Interview: Successfully processed. Next stage: ${result.nextStage || "same"}`);
         }
+      } else {
+        // === RAG-ONLY FLOW (Generic/Support bot) ===
+        console.log("🤖 Generic Bot: Using RAG-only response flow");
 
-        return null;
+        responseText = await ctx.runAction(internal.agents.ragOnlyResponse, {
+          participantId: participant._id,
+          text: args.body,
+          messageId: args.messageId,
+        });
+
+        if (responseText) {
+          await ctx.runAction(api.whatsapp.sendMessage, {
+            to: args.from,
+            body: responseText,
+          });
+
+          // Log the AI interaction
+          const messageDoc = await ctx.runQuery(api.whatsapp.getMessagesByParticipant, {
+            participantId: participant._id,
+            limit: 1,
+          });
+
+          if (messageDoc && messageDoc.messages.length > 0) {
+            await ctx.runMutation(internal.agents.updateMessageWithAIMetadata, {
+              messageId: messageDoc.messages[0]._id,
+              aiMetadata: {
+                model: botConfig?.config?.model || "gpt-4o-mini",
+                tokens: 0,
+                processingTimeMs: 0,
+                fallbackUsed: false,
+                timestamp: Date.now(),
+                threadId: participant.threadId || "default",
+              },
+            });
+          }
+
+          console.log("🤖 Generic Bot: Successfully processed message");
+        }
       }
-
-      // This shouldn't happen, but keeping as fallback
-      console.error("🤖 AI Agent: Failed to get or create participant");
-
-      const fallbackResponse = "Desculpe, houve um problema técnico. Tente novamente em alguns instantes.";
-
-      await ctx.runAction(api.whatsapp.sendMessage, {
-        to: args.from,
-        body: fallbackResponse,
-      });
-
     } catch (error) {
       console.error("🤖 AI Agent: Error in processIncomingMessage:", error);
-
-      // Final fallback
-      const fallbackResponse = "Desculpe, houve um problema técnico. Tente novamente em alguns instantes.";
 
       try {
         await ctx.runAction(api.whatsapp.sendMessage, {
           to: args.from,
-          body: fallbackResponse,
+          body: "Desculpe, houve um problema técnico. Tente novamente em alguns instantes.",
         });
       } catch (sendError) {
         console.error("🤖 AI Agent: Failed to send fallback message:", sendError);

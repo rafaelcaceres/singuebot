@@ -43,6 +43,16 @@ const applicationTables = {
       fallbackMessage: v.optional(v.string()), // Fallback when AI fails
       enableRAG: v.boolean(), // Whether to use RAG
       ragNamespace: v.optional(v.string()), // RAG namespace for this bot
+      // Guardrails
+      guardrailsPrompt: v.optional(v.string()), // Extra guardrails/restrictions for the bot
+      // Feature flags
+      enableInterview: v.optional(v.boolean()), // Enable interview state machine
+      enableClustering: v.optional(v.boolean()), // Enable participant clustering/UMAP
+      enableTemplates: v.optional(v.boolean()), // Enable HSM template management
+      enableParticipantRAG: v.optional(v.boolean()), // Enable participant semantic search
+      enableCSVImport: v.optional(v.boolean()), // Enable CSV participant import
+      consentRequired: v.optional(v.boolean()), // Require LGPD consent before chat
+      consentMessage: v.optional(v.string()), // Custom consent request message
     }),
     isActive: v.boolean(), // Whether bot is active
     createdAt: v.number(),

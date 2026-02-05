@@ -30,9 +30,13 @@ interface Document {
 export const KnowledgePage: React.FC = () => {
   const { toast } = useToast();
   const [selectedTab, setSelectedTab] = useState("documents");
-  
-  // Queries
-  const documents = useQuery(api.admin.getKnowledgeDocuments) || [];
+
+  // Get active bot config for namespace
+  const botSettings = useQuery(api.functions.botConfig.getActiveBotSettings);
+  const namespace = botSettings?.config?.ragNamespace;
+
+  // Queries - filter by namespace
+  const documents = useQuery(api.admin.getKnowledgeDocuments, { namespace }) || [];
   const processingJobs = useQuery(api.admin.getProcessingJobs) || [];
   
   // Mutations
@@ -278,7 +282,7 @@ export const KnowledgePage: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="upload">
-          <UploadDocuments />
+          <UploadDocuments namespace={namespace} />
         </TabsContent>
 
         <TabsContent value="jobs" className="space-y-4">

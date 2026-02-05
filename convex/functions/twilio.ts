@@ -162,23 +162,30 @@ export const processInboundMessage = internalAction({
         return;
       }
 
-      // Check if participant has given consent
-      if (!participant.consent && !isConsentMessage(args.body)) {
-        // Send consent request
-        await ctx.runAction(api.functions.twilio.sendMessage, {
-          to: args.from,
-          body: "👋 Olá! Para começarmos nossa conversa sobre sua jornada profissional, preciso do seu consentimento para coletar e processar seus dados. Você concorda? Responda SIM para continuar.",
-        });
-        return;
-      }
+      // Check bot config for consent requirement
+      const botConfig = await ctx.runQuery(internal.functions.botConfig.getActiveBotConfig);
+      const consentRequired = botConfig?.config?.consentRequired ?? true;
 
-      // Update consent if this is a consent message
-      if (!participant.consent && isConsentMessage(args.body)) {
-        await ctx.runMutation(internal.functions.twilio_db.updateParticipantConsent, {
-          participantId: participant._id,
-          consent: true,
-        });
-        console.log("✅ Twilio: Consent granted for", args.from);
+      if (consentRequired) {
+        // Check if participant has given consent
+        if (!participant.consent && !isConsentMessage(args.body)) {
+          const consentMessage = botConfig?.config?.consentMessage ||
+            "Olá! Para começarmos nossa conversa, preciso do seu consentimento para coletar e processar seus dados. Você concorda? Responda SIM para continuar.";
+          await ctx.runAction(api.functions.twilio.sendMessage, {
+            to: args.from,
+            body: consentMessage,
+          });
+          return;
+        }
+
+        // Update consent if this is a consent message
+        if (!participant.consent && isConsentMessage(args.body)) {
+          await ctx.runMutation(internal.functions.twilio_db.updateParticipantConsent, {
+            participantId: participant._id,
+            consent: true,
+          });
+          console.log("✅ Twilio: Consent granted for", args.from);
+        }
       }
 
 
