@@ -1,6 +1,6 @@
 import { v } from "convex/values";
-import { query, mutation, internalMutation, internalAction } from "./_generated/server";
-import { internal } from "./_generated/api";
+import { query, mutation, action, internalMutation, internalAction } from "./_generated/server";
+import { api, internal } from "./_generated/api";
 import { rag } from "./functions/rag";
 
 // Helper function to get or create conversation for participant
@@ -35,8 +35,16 @@ export const getOrganizerByEmail = query({
       .query("organizers")
       .withIndex("by_email", (q) => q.eq("email", args.email))
       .first();
-    
-    return organizer;
+
+    if (organizer) return organizer;
+
+    // Bootstrap mode: if no organizers exist at all, treat any authenticated user as owner
+    const anyOrganizer = await ctx.db.query("organizers").first();
+    if (!anyOrganizer) {
+      return { email: args.email, role: "owner" as const, _bootstrap: true };
+    }
+
+    return null;
   },
 });
 
@@ -730,68 +738,39 @@ export const getConversationMessages = query({
     const participant = await ctx.db.get(args.participantId);
     if (!participant) return { messages: [], participant: null };
 
+    // Use the participantId index for efficient lookup
     const messages = await ctx.db
       .query("whatsappMessages")
-      .filter(q => q.eq(q.field("stateSnapshot.twilioPayload.From"), participant.phone))
-      .order("desc")
+      .withIndex("by_participant", (q) => q.eq("participantId", args.participantId))
+      .order("asc")
       .take(args.limit || 100);
-
-    // Also get messages TO the participant
-    const outboundMessages = await ctx.db
-      .query("whatsappMessages")
-      .filter(q => q.eq(q.field("stateSnapshot.twilioPayload.To"), participant.phone))
-      .order("desc")
-      .take(args.limit || 100);
-
-    // Combine and sort all messages (oldest first for chat display)
-    const allMessages = [...messages, ...outboundMessages]
-      .sort((a, b) => a._creationTime - b._creationTime)
-      .slice(0, args.limit || 100);
 
     return {
-      messages: allMessages,
+      messages,
       participant,
     };
   },
 });
 
-export const sendManualMessage = mutation({
+export const sendManualMessage = action({
   args: {
     participantId: v.id("participants"),
     message: v.string(),
   },
   handler: async (ctx, args) => {
-    const participant = await ctx.db.get(args.participantId);
+    // Get participant to find their phone number
+    const participant = await ctx.runQuery(api.admin.getParticipantById, {
+      participantId: args.participantId,
+    });
     if (!participant) throw new Error("Participant not found");
 
-    // Create outbound message record
-    const messageId = await ctx.db.insert("whatsappMessages", {
-      messageId: `manual_${Date.now()}`,
+    // Send via Twilio (this is what the WhatsApp page does)
+    await ctx.runAction(api.whatsapp.sendMessage, {
+      to: participant.phone,
       body: args.message,
-      status: "sent",
-      direction: "outbound",
-      messageType: "outbound",
-      participantId: args.participantId,
-      conversationId: await getOrCreateConversation(ctx, args.participantId),
-      stateSnapshot: {
-        twilioPayload: {
-          MessageSid: `manual_${Date.now()}`,
-          AccountSid: "manual",
-          From: "whatsapp:+5511999999999", // System number
-          To: participant.phone,
-          Body: args.message,
-        },
-        processingState: {
-          received: Date.now(),
-          processed: Date.now(),
-          responded: Date.now(),
-        }
-      }
     });
 
-    // TODO: Integrate with Twilio to actually send the message
-    // For now, just return the message ID
-    return messageId;
+    return { success: true };
   },
 });
 

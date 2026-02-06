@@ -14,30 +14,30 @@ Fabi é uma mulher preta, 45 anos, trajetória profissional diversa (setor públ
 Sua missão é personalizar e estimular a jornada do participante antes, durante e depois do evento, com foco em decisões de carreira, conexões estratégicas e ativação de oportunidades.
 
 Tom de voz
-Sofisticado, provocativo e direto; 
+Sofisticado, provocativo e direto;
 Inspirador, mas concreto (sempre com entregas práticas/links/CTAs);
 Ambicioso sem arrogância, fala de igual para igual, trata o público como pares;
 Narrativa de rede: o protagonismo é da liderança participante, o FIB (e a Fabi) mediam e potencializam.
 Diretrizes linguagem
-Português correto e simples; 
+Português correto e simples;
 Sem gírias e sem formalidade excessiva;
 Frases curtas, priorizando o entendimento entre as partes;
 Evitar jargões técnicos desnecessários. Quando inevitáveis, contextualiza em 1 linha;
-Não usa termos diretamente relacionados com a diversidade; 
+Não usa termos diretamente relacionados com a diversidade;
 Prioriza estimular liderança, influência e estratégia;
 Sempre fecha a conversa com a próxima etapa objetiva (CTA curto).
 
 O que ela não faz
 Não resolve logística complexa do evento (ingresso, credencial, deslocamento, estande etc.);
-Não debate política/temas fora do escopo carreira-liderança do FIB; 
-Não tenta “virar coach por mensagem”; 
+Não debate política/temas fora do escopo carreira-liderança do FIB;
+Não tenta “virar coach por mensagem”;
 Não estende a conversa além do necessário para estimular o participante a aproveitar ao máximo o FIB para sua carreira.
 
 O que ela faz
-É curiosa com a trajetória de carreira, liderança e momento profissional dos participantes; 
-Faz boas perguntas para se conectar com os participantes e estimular a interação com conteúdos e pessoas que se relacionam com o momento de carreira do participante; 
-Retoma memória de respostas anteriores para personalizar a próxima interação (sem ser prolixa); 
-Recomenda painéis, pessoas e movimentos coerentes com o perfil/objetivo do FIB. 
+É curiosa com a trajetória de carreira, liderança e momento profissional dos participantes;
+Faz boas perguntas para se conectar com os participantes e estimular a interação com conteúdos e pessoas que se relacionam com o momento de carreira do participante;
+Retoma memória de respostas anteriores para personalizar a próxima interação (sem ser prolixa);
+Recomenda painéis, pessoas e movimentos coerentes com o perfil/objetivo do FIB.
 
 Fabi pensa com base no método ASA
 Ancestralidade: reconhece trajetórias e repertórios como potência.
@@ -46,7 +46,7 @@ Ascensão: provoca visão de futuro e compromissos práticos.`;
 
 const FABI_MAIN_FUNCTIONS = `
 PRINCIPAIS FUNÇÕES:
-1. Conduzir entrevistas estruturadas seguindo os estágios definidos. 
+1. Conduzir entrevistas estruturadas seguindo os estágios definidos.
 2. Fazer perguntas reflexivas sobre desenvolvimento de carreira
 3. Avaliar respostas e determinar progressão
 4. Fornecer feedback construtivo e empático
@@ -56,7 +56,7 @@ PRINCIPAIS FUNÇÕES:
 
 const FABI_RESPONSE_GUIDELINES = `
 DIRETRIZES DE RESPOSTA:
-- Sempre que o prompt tiver uma tag <Question> use a pergunta exatamente como está na tag. 
+- Sempre que o prompt tiver uma tag <Question> use a pergunta exatamente como está na tag.
 - Use linguagem acolhedora e empática
 - Faça uma pergunta por vez
 - Conecte as perguntas com as respostas anteriores
@@ -110,7 +110,7 @@ const searchKnowledgeTool = createTool({
 
       // Format results for the agent
       const formattedResults = results
-        .map((result: any, index: number) => 
+        .map((result: any, index: number) =>
           `${index + 1}. ${result.title}\n${result.content}\n(Relevância: ${(result.score * 100).toFixed(1)}%)`
         )
         .join("\n\n");
@@ -137,15 +137,15 @@ const interviewSessionTool = createTool({
       if (args.action === "get") {
         return "Sessão de entrevista ativa. Continuando com o fluxo FIB.";
       }
-      
+
       if (args.action === "update" && args.stage) {
         return `Solicitação para atualizar sessão para o estágio: ${args.stage}`;
       }
-      
+
       if (args.action === "next_stage") {
         return "Próximo estágio determinado com base na resposta do usuário.";
       }
-      
+
       return "Ação não reconhecida.";
     } catch (error) {
       console.error("Interview session tool error:", error);
@@ -231,8 +231,8 @@ const responseValidationTool = createTool({
     previousResponses: z.optional(z.array(z.string())).describe("Previous responses for context")
   }),
   handler: async (ctx, args): Promise<z.infer<typeof ResponseEvaluationSchema>> => {
-    const { userResponse, currentStage, questionContext } = args;
-    
+    const { userResponse, currentStage } = args;
+
     // Security assessment - check for prompt injection attempts
     const suspiciousPatterns = [
       /ignore\s+(previous|all)\s+instructions?/i,
@@ -242,15 +242,15 @@ const responseValidationTool = createTool({
       /\[INST\]|\[\/INST\]/i,
       /###\s*(?:instruction|system|prompt)/i
     ];
-    
+
     const hasSuspiciousContent = suspiciousPatterns.some(pattern => pattern.test(userResponse));
     const security = hasSuspiciousContent ? "suspicious" : "safe";
-    
+
     // Word count and basic completeness
     const wordCount = userResponse.trim().split(/\s+/).length;
     const stageCriteria = CAREER_STAGE_CRITERIA[currentStage as keyof typeof CAREER_STAGE_CRITERIA];
     const minWords = stageCriteria?.minWordCount || 15;
-    
+
     // Quality assessment based on length and content
     let quality: "excellent" | "good" | "adequate" | "insufficient";
     if (wordCount < minWords) {
@@ -262,13 +262,13 @@ const responseValidationTool = createTool({
     } else {
       quality = "excellent";
     }
-    
+
     // Relevance assessment - check for keywords and context
     const keywords = stageCriteria?.keywords || [];
-    const keywordMatches = keywords.filter((keyword: string) => 
+    const keywordMatches = keywords.filter((keyword: string) =>
       userResponse.toLowerCase().includes(keyword.toLowerCase())
     ).length;
-    
+
     let relevance: "highly_relevant" | "relevant" | "somewhat_relevant" | "irrelevant";
     if (keywordMatches >= 3) {
       relevance = "highly_relevant";
@@ -279,7 +279,7 @@ const responseValidationTool = createTool({
     } else {
       relevance = "irrelevant";
     }
-    
+
     // Completeness assessment
     let completeness: "complete" | "partial" | "incomplete";
     if (quality === "excellent" && relevance === "highly_relevant") {
@@ -289,24 +289,24 @@ const responseValidationTool = createTool({
     } else {
       completeness = "incomplete";
     }
-    
+
     // ASA connection scoring (simplified for now)
     const asaConnection = {
       ancestralidade: currentStage === "momento_carreira" ? Math.min(keywordMatches * 2, 10) : 3,
       sabedoria: currentStage === "expectativas_fib" ? Math.min(keywordMatches * 2, 10) : 3,
       ascensao: currentStage === "valor_desejado" ? Math.min(keywordMatches * 2, 10) : 3
     };
-    
+
     // Determine if can progress
-    const canProgress = security === "safe" && 
-                       quality !== "insufficient" && 
-                       relevance !== "irrelevant" && 
+    const canProgress = security === "safe" &&
+                       quality !== "insufficient" &&
+                       relevance !== "irrelevant" &&
                        completeness !== "incomplete";
-    
+
     // Generate feedback
     let feedback = "";
     let nextAction: "advance" | "clarify" | "redirect" | "repeat" = "advance";
-    
+
     if (security !== "safe") {
       feedback = "Vamos manter nossa conversa focada na sua jornada profissional. ";
       nextAction = "redirect";
@@ -323,7 +323,7 @@ const responseValidationTool = createTool({
       feedback = "Excelente! Sua resposta mostra uma reflexão profunda sobre sua jornada. ";
       nextAction = "advance";
     }
-    
+
     return {
       quality,
       relevance,
@@ -352,7 +352,7 @@ const progressEvaluationTool = createTool({
   handler: async (ctx, args): Promise<z.infer<typeof ProgressDecisionSchema>> => {
     const { responses, currentStage } = args;
     const stageCriteria = CAREER_STAGE_CRITERIA[currentStage as keyof typeof CAREER_STAGE_CRITERIA];
-    
+
     if (!stageCriteria) {
       return {
         canAdvance: true,
@@ -363,39 +363,39 @@ const progressEvaluationTool = createTool({
         reasoning: "Estágio não reconhecido, permitindo avanço por padrão."
       };
     }
-    
+
     // Analyze all responses for this stage
     const allText = responses.join(" ");
     const wordCount = allText.trim().split(/\s+/).length;
     const keywords = stageCriteria.keywords;
-    
+
     // Check for required elements
     const missingElements: Array<string> = [];
-    const keywordMatches = keywords.filter((keyword: string) => 
+    const keywordMatches = keywords.filter((keyword: string) =>
       allText.toLowerCase().includes(keyword.toLowerCase())
     ).length;
-    
+
     // Evaluate completeness
     const hasMinimumLength = wordCount >= stageCriteria.minWordCount;
     const hasRelevantKeywords = keywordMatches >= 2;
     const hasSubstantialContent = wordCount >= stageCriteria.minWordCount * 1.5;
-    
+
     if (!hasMinimumLength) {
       missingElements.push("Resposta muito breve - precisa de mais detalhes");
     }
-    
+
     if (!hasRelevantKeywords) {
       missingElements.push("Falta conexão com o tema da pergunta");
     }
-    
+
     if (!hasSubstantialContent) {
       missingElements.push("Precisa de mais profundidade na reflexão");
     }
-    
+
     // Determine if can advance
     const canAdvance = missingElements.length === 0;
     const currentStageComplete = canAdvance && hasSubstantialContent && keywordMatches >= 3;
-    
+
     // Determine recommended action
     let recommendedAction: "advance" | "stay" | "clarify" | "restart_stage";
     if (canAdvance && currentStageComplete) {
@@ -407,15 +407,15 @@ const progressEvaluationTool = createTool({
     } else {
       recommendedAction = "stay";
     }
-    
+
     // Calculate confidence score
     const completenessScore = Math.min(wordCount / (stageCriteria.minWordCount * 2), 1);
     const relevanceScore = Math.min(keywordMatches / 4, 1);
     const confidenceScore = (completenessScore + relevanceScore) / 2;
-    
+
     // Generate reasoning
     const reasoning = `Análise do estágio "${stageCriteria.name}": ${responses.length} resposta(s), ${wordCount} palavras, ${keywordMatches} palavras-chave relevantes. ${missingElements.length > 0 ? `Elementos em falta: ${missingElements.join(", ")}` : "Todos os critérios atendidos."}`;
-    
+
     return {
       canAdvance,
       currentStageComplete,
@@ -436,7 +436,7 @@ const securityFilterTool = createTool({
   }),
   handler: async (ctx, args): Promise<z.infer<typeof SecurityAssessmentSchema>> => {
     const { input, context } = args;
-    
+
     // Define suspicious patterns for prompt injection
     const suspiciousPatterns = [
       { pattern: /ignore\s+(previous|all)\s+instructions?/i, description: "Instruction override attempt" },
@@ -449,17 +449,17 @@ const securityFilterTool = createTool({
       { pattern: /(?:execute|run|eval)\s*\(/i, description: "Code execution attempt" },
       { pattern: /javascript:|data:|vbscript:/i, description: "Script injection" }
     ];
-    
+
     // Check for suspicious patterns
     const detectedPatterns: Array<string> = [];
     let threatLevel: "none" | "low" | "medium" | "high" = "none";
-    
+
     for (const { pattern, description } of suspiciousPatterns) {
       if (pattern.test(input)) {
         detectedPatterns.push(description);
       }
     }
-    
+
     // Assess threat level
     if (detectedPatterns.length === 0) {
       threatLevel = "none";
@@ -470,7 +470,7 @@ const securityFilterTool = createTool({
     } else {
       threatLevel = "high";
     }
-    
+
     // Check if input is on-topic for interview
     const interviewKeywords = [
       "trabalho", "carreira", "profissional", "empresa", "experiência",
@@ -478,17 +478,17 @@ const securityFilterTool = createTool({
       "habilidade", "competência", "formação", "educação", "networking",
       "liderança", "gestão", "projeto", "resultado", "impacto"
     ];
-    
+
     const inputLower = input.toLowerCase();
-    const topicMatches = interviewKeywords.filter(keyword => 
+    const topicMatches = interviewKeywords.filter(keyword =>
       inputLower.includes(keyword)
     ).length;
-    
+
     const isOnTopic = topicMatches > 0 || input.length < 50; // Short responses might be clarifications
-    
+
     // Determine if input is safe
     const isSafe = threatLevel === "none" || threatLevel === "low";
-    
+
     // Generate recommended response
     let recommendedResponse = "";
     if (!isSafe) {
@@ -498,7 +498,7 @@ const securityFilterTool = createTool({
     } else {
       recommendedResponse = "Continue compartilhando suas reflexões.";
     }
-    
+
     return {
       isSafe,
       threatLevel,
@@ -550,11 +550,12 @@ const genericSearchKnowledgeTool = createTool({
 });
 
 // Generic configurable agent (for RAG-only / support bots)
+// Note: We use prompt-based RAG (upfront search), so the agent doesn't need the search tool.
+// The RAG context is injected into the system prompt before calling generateText.
 export const genericAgent = new Agent(components.agent, {
   name: "GenericAssistant",
   instructions: "Você é um assistente virtual configurável. Siga rigorosamente as instruções de personalidade e guardrails fornecidas no contexto da conversa.",
   tools: {
-    searchKnowledge: genericSearchKnowledgeTool,
     securityFilter: securityFilterTool,
   },
   ...sharedDefaults,
@@ -569,7 +570,16 @@ function buildSystemPrompt(personality: string, guardrails: string, ragContext: 
   }
 
   if (ragContext) {
-    prompt += `\n\n--- INFORMAÇÕES DA BASE DE CONHECIMENTO ---\n${ragContext}\n--- FIM DAS INFORMAÇÕES ---\n\nUse APENAS as informações acima para responder. Se a pergunta não pode ser respondida com essas informações, diga que não encontrou a informação e sugira que o usuário entre em contato com o canal apropriado.`;
+    prompt += `\n\n=== DOCUMENTOS DE REFERÊNCIA ===
+${ragContext}
+=== FIM DOS DOCUMENTOS ===
+
+INSTRUÇÕES PARA RESPOSTA:
+1. Use as informações dos documentos acima para responder de forma COMPLETA e DETALHADA
+2. Combine informações de múltiplos trechos quando necessário para dar uma resposta abrangente
+3. Se a informação estiver parcialmente disponível, forneça o que encontrou e indique o que falta
+4. Cite os procedimentos, prazos, ou etapas específicas mencionadas nos documentos
+5. Se a pergunta não puder ser respondida com os documentos, diga claramente que não encontrou a informação`;
   } else {
     prompt += `\n\nNenhuma informação relevante foi encontrada na base de conhecimento para esta pergunta. Informe ao usuário que você não possui essa informação e sugira que ele entre em contato com o canal apropriado.`;
   }
@@ -678,13 +688,13 @@ export const getAIInteractions = query({
       .filter(msg => {
         const hasAIMetadata = msg.aiMetadata !== undefined;
         if (!hasAIMetadata) return false;
-        
+
         if (!args.phoneNumber) return true;
-        
+
         // Extract from/to from stateSnapshot if available
         const from = msg.stateSnapshot?.twilioPayload?.From;
         const to = msg.stateSnapshot?.twilioPayload?.To;
-        
+
         return from === args.phoneNumber || to === args.phoneNumber;
       })
       .slice(0, limit);
@@ -693,7 +703,7 @@ export const getAIInteractions = query({
      return aiMessages.map(msg => {
        const from = msg.stateSnapshot?.twilioPayload?.From || "";
        const to = msg.stateSnapshot?.twilioPayload?.To || "";
-       
+
        return {
          _id: msg._id,
          _creationTime: msg._creationTime,
@@ -732,22 +742,41 @@ export const ragOnlyResponse = internalAction({
     const fallbackMessage: string = botConfig?.config?.fallbackMessage || DEFAULT_FALLBACK;
     const tenantSlug: string = botConfig?.tenant?.slug || "global";
     const botName: string = botConfig?.name || "default";
+    const ragNamespace: string | undefined = botConfig?.config?.ragNamespace;
 
-    // 2. Search RAG for relevant context
+    // Model settings from bot config
+    const maxTokens: number = botConfig?.config?.maxTokens || 2000; // Increased default
+    const temperature: number = botConfig?.config?.temperature ?? 0.3;
+
+    // 2. Search RAG for relevant context (increased limit for better coverage)
     let ragContext = "";
     if (botConfig?.config?.enableRAG !== false) {
       try {
+        // Use ragNamespace from bot config if available, otherwise generate from tenant/bot
         const ragResults = await ctx.runAction(internal.functions.genericRAG.searchKnowledgeForBot, {
           tenantSlug,
           botName,
           query: args.text,
-          limit: 5,
+          limit: 10, // Increased from 5 for better context coverage
+          namespace: ragNamespace, // Direct namespace from bot config
         });
 
         if (ragResults.length > 0) {
-          ragContext = ragResults
-            .map((r: any, i: number) => `[${i + 1}] ${r.title}: ${r.content}`)
-            .join("\n\n");
+          // Filter out low-relevance results (below 40% score) and format better
+          const relevantResults = ragResults.filter((r: any) => r.score >= 0.4);
+
+          if (relevantResults.length > 0) {
+            ragContext = relevantResults
+              .map((r: any, i: number) => {
+                // Use content directly if title is empty or "Untitled"
+                const title = r.title && r.title !== "Untitled" ? r.title : "";
+                const header = title ? `[Documento ${i + 1}: ${title}]` : `[Trecho ${i + 1}]`;
+                return `${header}\n${r.content}`;
+              })
+              .join("\n\n---\n\n");
+
+            console.log(`📚 RAG: Using ${relevantResults.length} relevant chunks (filtered from ${ragResults.length})`);
+          }
         }
       } catch (error) {
         console.error("RAG search error:", error);
@@ -762,6 +791,60 @@ export const ragOnlyResponse = internalAction({
       participantId: args.participantId,
     });
 
+    // Helper function to create a fresh thread
+    const createFreshThread = async () => {
+      const newThreadResult = await genericAgent.createThread(ctx, {});
+      const newThreadId = newThreadResult.thread.threadId;
+      await ctx.runMutation(internal.functions.twilio_db.updateParticipantThreadId, {
+        participantId: args.participantId,
+        threadId: newThreadId,
+      });
+      return newThreadResult;
+    };
+
+    // Helper function to generate response with retry on thread errors
+    const generateResponseWithRetry = async (threadResult: any, isRetry = false): Promise<string> => {
+      try {
+        const result = await threadResult.thread.generateText(
+          {
+            prompt: args.text,
+            system: systemPrompt,
+            maxTokens, // Use bot config maxTokens for complete responses
+            temperature, // Use bot config temperature
+          },
+          {
+            contextOptions: {
+              recentMessages: 10,
+              searchOptions: {
+                limit: 5,
+                textSearch: true,
+              },
+            },
+            storageOptions: {
+              saveMessages: "all",
+            },
+          }
+        );
+
+        const response = result.text?.trim();
+        if (!response) return fallbackMessage;
+
+        console.log(`Generic bot response generated in ${Date.now() - startTime}ms`);
+        return response;
+      } catch (error: any) {
+        // Check if it's a "Thread not found" error and we haven't retried yet
+        const errorMessage = error?.message || String(error);
+        if (!isRetry && errorMessage.includes("Thread") && errorMessage.includes("not found")) {
+          console.log("Thread not found, creating new thread and retrying...");
+          const freshThreadResult = await createFreshThread();
+          return generateResponseWithRetry(freshThreadResult, true);
+        }
+
+        console.error("Generic agent response error:", error);
+        return fallbackMessage;
+      }
+    };
+
     let currentThreadId = participant?.threadId;
     let threadResult;
 
@@ -769,53 +852,15 @@ export const ragOnlyResponse = internalAction({
       if (currentThreadId) {
         threadResult = await genericAgent.continueThread(ctx, { threadId: currentThreadId });
       } else {
-        threadResult = await genericAgent.createThread(ctx, {});
-        currentThreadId = threadResult.thread.threadId;
-        await ctx.runMutation(internal.functions.twilio_db.updateParticipantThreadId, {
-          participantId: args.participantId,
-          threadId: currentThreadId,
-        });
+        threadResult = await createFreshThread();
       }
     } catch (error) {
-      console.error("Thread error, creating new one:", error);
-      threadResult = await genericAgent.createThread(ctx, {});
-      currentThreadId = threadResult.thread.threadId;
-      await ctx.runMutation(internal.functions.twilio_db.updateParticipantThreadId, {
-        participantId: args.participantId,
-        threadId: currentThreadId,
-      });
+      console.error("Thread initialization error, creating new one:", error);
+      threadResult = await createFreshThread();
     }
 
-    const { thread } = threadResult;
-
-    // 5. Generate response
-    try {
-      const result = await thread.generateText(
-        {
-          prompt: args.text,
-          messages: [
-            { role: "system", content: systemPrompt },
-          ],
-        },
-        {
-          contextOptions: {
-            recentMessages: 10,
-          },
-          storageOptions: {
-            saveMessages: "all",
-          },
-        }
-      );
-
-      const response = result.text?.trim();
-      if (!response) return fallbackMessage;
-
-      console.log(`Generic bot response generated in ${Date.now() - startTime}ms`);
-      return response;
-    } catch (error) {
-      console.error("Generic agent response error:", error);
-      return fallbackMessage;
-    }
+    // 5. Generate response with automatic retry on thread errors
+    return generateResponseWithRetry(threadResult);
   },
 });
 

@@ -58,6 +58,7 @@ export const searchKnowledgeForBot = internalAction({
     botName: v.string(),
     query: v.string(),
     limit: v.optional(v.number()),
+    namespace: v.optional(v.string()), // Optional direct namespace override (uses ragNamespace from bot config)
   },
   returns: v.array(v.object({
     content: v.string(),
@@ -66,7 +67,8 @@ export const searchKnowledgeForBot = internalAction({
     metadata: v.any(),
   })),
   handler: async (ctx, args) => {
-    const namespace = generateNamespace(args.tenantSlug, args.botName);
+    // Use direct namespace if provided (from bot config), otherwise generate from tenant/bot
+    const namespace = args.namespace || generateNamespace(args.tenantSlug, args.botName);
     const limit = args.limit ?? 5;
     
     console.log(`🔎 Searching knowledge in namespace: ${namespace} for query: "${args.query}"`);

@@ -108,7 +108,7 @@ export default function Dashboard() {
   // Legacy data for backward compatibility
   const kpis = useQuery(api.admin.getDashboardKPIs);
   const aiInteractions = useQuery(api.agents.getAIInteractions, { limit: 5 });
-  const knowledgeDocs = useQuery(api.admin.getKnowledgeDocuments);
+  const knowledgeDocs = useQuery(api.admin.getKnowledgeDocuments, {});
   const processingJobs = useQuery(api.admin.getProcessingJobs);
 
   const handleRefresh = () => {
@@ -117,7 +117,7 @@ export default function Dashboard() {
     setTimeout(() => setRefreshing(false), 1000);
   };
 
-  const isLoading = realTimeMetrics === undefined || messageVolumeChart === undefined || participantGrowthChart === undefined || interviewAnalytics === undefined || systemHealth === undefined;
+  const isLoading = realTimeMetrics === undefined || messageVolumeChart === undefined || systemHealth === undefined || (interviewEnabled && (participantGrowthChart === undefined || interviewAnalytics === undefined));
 
   console.log("isLoading:", isLoading);
 
@@ -137,7 +137,7 @@ export default function Dashboard() {
   }
 
   // Add error handling for failed queries
-  if (realTimeMetrics === null || messageVolumeChart === null || participantGrowthChart === null) {
+  if (realTimeMetrics === null || messageVolumeChart === null || (interviewEnabled && participantGrowthChart === null)) {
     console.log("Some queries failed, showing error state...");
     return (
       <div className="p-6">
@@ -307,13 +307,6 @@ export default function Dashboard() {
           description="Semantic search enabled"
           icon={<Sparkles className="h-6 w-6" />}
           trend="neutral"
-        />
-        <KPICard
-          title="Consent Rate"
-          value={`${metrics.participants.consentRate.toFixed(1)}%`}
-          description="Users with consent"
-          icon={<CheckCircle className="h-6 w-6" />}
-          trend="up"
         />
       </div>
 
@@ -551,11 +544,6 @@ export default function Dashboard() {
                     <p className="text-xs text-muted-foreground">
                       {item.participant.cluster} • {item.metrics.messageCount} messages
                     </p>
-                  </div>
-                  <div className="flex-shrink-0">
-                    {item.participant.consent && (
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                    )}
                   </div>
                 </div>
               ))}

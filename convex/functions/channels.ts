@@ -1,6 +1,5 @@
 import { v } from "convex/values";
-import { internalQuery, internalMutation, query, mutation } from "../_generated/server";
-import { Doc, Id } from "../_generated/dataModel";
+import { internalQuery, query, mutation } from "../_generated/server";
 
 // Get channel by tenant slug, bot name, and channel type
 export const getChannelByPath = internalQuery({
@@ -52,7 +51,7 @@ export const getChannelByPath = internalQuery({
     // Finally, get channel by type within the bot
     const channel = await ctx.db
       .query("channels")
-      .withIndex("by_tenant_bot", (q) => 
+      .withIndex("by_tenant_bot", (q) =>
         q.eq("tenantId", tenant._id).eq("botId", bot._id)
       )
       .filter((q) => q.eq(q.field("type"), args.channelType))
@@ -89,7 +88,7 @@ export const getChannelsByTenant = query({
       channels.map(async (channel) => {
         const bot = await ctx.db.get(channel.botId);
         const tenant = await ctx.db.get(channel.tenantId);
-        
+
         return {
           ...channel,
           botName: bot?.name || "Unknown",
@@ -128,7 +127,7 @@ export const createChannel = mutation({
     // Check if channel already exists for this tenant/bot/type combination
     const existingChannel = await ctx.db
       .query("channels")
-      .withIndex("by_tenant_bot", (q) => 
+      .withIndex("by_tenant_bot", (q) =>
         q.eq("tenantId", args.tenantId).eq("botId", args.botId)
       )
       .filter((q) => q.eq(q.field("type"), args.type))
@@ -163,7 +162,7 @@ export const updateChannelConfiguration = mutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const channel = await ctx.db.get(args.channelId);
-    
+
     if (!channel) {
       throw new Error("Channel not found");
     }
@@ -186,7 +185,7 @@ export const toggleChannelStatus = mutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const channel = await ctx.db.get(args.channelId);
-    
+
     if (!channel) {
       throw new Error("Channel not found");
     }
@@ -220,7 +219,7 @@ export const getChannelById = query({
   ),
   handler: async (ctx, args) => {
     const channel = await ctx.db.get(args.channelId);
-    
+
     if (!channel) {
       return null;
     }

@@ -4,6 +4,23 @@ import { api } from "../../../convex/_generated/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { 
   Users, 
   UserPlus, 
@@ -424,6 +441,129 @@ export const UserManagement: React.FC = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Add Organizer Dialog */}
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Adicionar Organizador</DialogTitle>
+            <DialogDescription>
+              Adicione um novo organizador ao sistema. Ele poderá acessar o painel administrativo com as permissões do papel selecionado.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="email@exemplo.com"
+                value={newOrganizer.email}
+                onChange={(e) => setNewOrganizer({ ...newOrganizer, email: e.target.value })}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="role">Papel</Label>
+              <Select
+                value={newOrganizer.role}
+                onValueChange={(value: UserRole) => setNewOrganizer({ ...newOrganizer, role: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um papel" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="owner">
+                    <div className="flex items-center space-x-2">
+                      <Crown className="h-4 w-4 text-yellow-500" />
+                      <span>Proprietário</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="editor">
+                    <div className="flex items-center space-x-2">
+                      <Edit className="h-4 w-4 text-blue-500" />
+                      <span>Editor</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="viewer">
+                    <div className="flex items-center space-x-2">
+                      <Eye className="h-4 w-4 text-gray-500" />
+                      <span>Visualizador</span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-muted-foreground">
+                {getRoleDescription(newOrganizer.role)}
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleAddOrganizer}>
+              Adicionar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Organizer Dialog */}
+      <Dialog open={!!editingOrganizer} onOpenChange={(open) => !open && setEditingOrganizer(null)}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Editar Papel</DialogTitle>
+            <DialogDescription>
+              Altere o papel de {editingOrganizer?.email}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="edit-role">Papel</Label>
+              <Select
+                value={editingOrganizer?.role || "viewer"}
+                onValueChange={(value: UserRole) => {
+                  if (editingOrganizer) {
+                    void handleUpdateOrganizer(editingOrganizer._id, value);
+                  }
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um papel" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="owner">
+                    <div className="flex items-center space-x-2">
+                      <Crown className="h-4 w-4 text-yellow-500" />
+                      <span>Proprietário</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="editor">
+                    <div className="flex items-center space-x-2">
+                      <Edit className="h-4 w-4 text-blue-500" />
+                      <span>Editor</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="viewer">
+                    <div className="flex items-center space-x-2">
+                      <Eye className="h-4 w-4 text-gray-500" />
+                      <span>Visualizador</span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-muted-foreground">
+                {getRoleDescription(editingOrganizer?.role || "viewer")}
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingOrganizer(null)}>
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

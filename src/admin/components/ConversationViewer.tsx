@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useQuery, useMutation } from 'convex/react';
+import { useQuery, useAction } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { usePermissions } from '../../hooks/useAuth';
 
@@ -39,8 +39,8 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
   const messages = conversationData?.messages || [];
   const participant = conversationData?.participant || null;
 
-  // Send manual message mutation
-  const sendMessage = useMutation(api.admin.sendManualMessage);
+  // Send manual message action (actually sends via Twilio)
+  const sendMessage = useAction(api.admin.sendManualMessage);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -141,21 +141,12 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
               </p>
             </div>
           </div>
-          <div className="flex items-center space-x-2">
-            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-              participant.consent 
-                ? 'bg-green-100 text-green-800' 
-                : 'bg-red-100 text-red-800'
-            }`}>
-              {participant.consent ? 'Com consentimento' : 'Sem consentimento'}
-            </span>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 text-xl font-bold"
-            >
-              ×
-            </button>
-          </div>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 text-xl font-bold"
+          >
+            ×
+          </button>
         </div>
 
         {/* Messages */}

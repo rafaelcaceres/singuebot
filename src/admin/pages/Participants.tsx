@@ -26,7 +26,6 @@ interface Participant {
   _id: string;
   phone: string;
   name?: string;
-  consent: boolean;
   clusterId?: string;
   currentStage: string;
   lastMessageAt?: number;
@@ -62,14 +61,12 @@ export const Participants: React.FC = () => {
   // Filters state
   const [clusterFilter, setClusterFilter] = useState<string>('');
   const [stageFilter, setStageFilter] = useState<string>('');
-  const [consentFilter, setConsentFilter] = useState<string>('');
 
   // Fetch data
   const participantsData = useQuery(api.admin.getParticipants, {
     limit: pagination.pageSize,
     offset: pagination.pageIndex * pagination.pageSize,
     clusterId: (clusterFilter || undefined) as any,
-    consent: consentFilter === 'true' ? true : consentFilter === 'false' ? false : undefined,
     stage: stageFilter || undefined,
   });
 
@@ -185,22 +182,6 @@ export const Participants: React.FC = () => {
           return cluster?.name || 'Sem cluster';
         },
         enableSorting: false,
-      }),
-      columnHelper.accessor('consent', {
-        header: 'Consentimento',
-        cell: (info) => {
-          const consent = info.getValue();
-          return (
-            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-              consent 
-                ? 'bg-green-100 text-green-800' 
-                : 'bg-red-100 text-red-800'
-            }`}>
-              {consent ? 'Sim' : 'Não'}
-            </span>
-          );
-        },
-        enableSorting: true,
       }),
       columnHelper.accessor('cargo', {
         header: 'Cargo',
@@ -318,7 +299,7 @@ export const Participants: React.FC = () => {
     if (!participantsData?.participants) return;
     
     // Create CSV content
-    const headers = ['Nome', 'Telefone', 'Cargo', 'Empresa', 'Setor', 'Estágio', 'Cluster', 'Consentimento', 'Última Mensagem', 'Data de Criação'];
+    const headers = ['Nome', 'Telefone', 'Cargo', 'Empresa', 'Setor', 'Estágio', 'Cluster', 'Última Mensagem', 'Data de Criação'];
     const csvContent = [
       headers.join(','),
       ...participantsData.participants.map(participant => [
@@ -329,8 +310,7 @@ export const Participants: React.FC = () => {
         participant.setor || '-',
         participant.currentStage,
         participant.cluster?.name || 'Sem cluster',
-        participant.consent ? 'Sim' : 'Não',
-        participant.lastMessageAt 
+        participant.lastMessageAt
           ? new Date(participant.lastMessageAt).toLocaleDateString('pt-BR')
           : 'Nunca',
         new Date(participant.createdAt).toLocaleDateString('pt-BR')
@@ -453,20 +433,6 @@ export const Participants: React.FC = () => {
             </select>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Consentimento
-            </label>
-            <select
-              value={consentFilter}
-              onChange={(e) => setConsentFilter(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Todos</option>
-              <option value="true">Com consentimento</option>
-              <option value="false">Sem consentimento</option>
-            </select>
-          </div>
         </div>
       </div>
 
