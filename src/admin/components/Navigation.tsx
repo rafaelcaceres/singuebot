@@ -14,7 +14,7 @@ import {
   Settings,
   Calendar,
   UserCog,
-  Phone,
+  Headphones,
   BarChart3,
   Sparkles,
   Network
@@ -38,9 +38,9 @@ const menuItems: MenuItem[] = [
     roles: ["owner", "editor", "viewer"],
   },
   {
-    title: "WhatsApp",
-    href: "/whatsapp",
-    icon: Phone,
+    title: "Central de Atendimento",
+    href: "/atendimento",
+    icon: Headphones,
     roles: ["owner", "editor", "viewer"],
   },
   {

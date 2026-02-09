@@ -35,6 +35,7 @@ import type * as http from "../http.js";
 import type * as migrations_consolidateParticipants from "../migrations/consolidateParticipants.js";
 import type * as migrations_migrateToGenericSystem from "../migrations/migrateToGenericSystem.js";
 import type * as migrations_runMigration from "../migrations/runMigration.js";
+import type * as operatorDashboard from "../operatorDashboard.js";
 import type * as router from "../router.js";
 import type * as routers_generic from "../routers/generic.js";
 import type * as seed from "../seed.js";
@@ -87,6 +88,7 @@ declare const fullApi: ApiFromModules<{
   "migrations/consolidateParticipants": typeof migrations_consolidateParticipants;
   "migrations/migrateToGenericSystem": typeof migrations_migrateToGenericSystem;
   "migrations/runMigration": typeof migrations_runMigration;
+  operatorDashboard: typeof operatorDashboard;
   router: typeof router;
   "routers/generic": typeof routers_generic;
   seed: typeof seed;

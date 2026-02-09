@@ -1,7 +1,6 @@
 import React, { useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 import { Authenticated, Unauthenticated, useConvexAuth } from "convex/react";
-import App from "./App";
 import { AdminLayout } from "./admin/layout/AdminLayout";
 import Dashboard from "./admin/pages/Dashboard";
 import { SignInForm } from "./SignInForm";
@@ -15,6 +14,7 @@ import { ParticipantExplorer } from "./admin/pages/ParticipantExplorer";
 import { ParticipantProfile } from "./admin/pages/ParticipantProfile";
 import { ParticipantClusters } from "./admin/pages/ParticipantClusters";
 import { SettingsPage } from "./admin/pages/SettingsPage";
+import { OperatorDashboard } from "./admin/pages/OperatorDashboard";
 
 function ImportPage() {
   return <div className="p-8">Importar CSV - Em desenvolvimento</div>;
@@ -78,10 +78,10 @@ export function AppRouter() {
         }>
           {/* Dashboard as home page */}
           <Route index element={<Dashboard />} />
-          
-          {/* WhatsApp interface moved to /whatsapp */}
-          <Route path="whatsapp" element={<App />} />
-          
+
+          {/* Central de Atendimento (substituiu /whatsapp) */}
+          <Route path="atendimento" element={<OperatorDashboard />} />
+
           {/* Admin pages */}
           <Route path="participants" element={<Participants />} />
           <Route path="participants/:id" element={<ParticipantProfile />} />
