@@ -1,7 +1,8 @@
 import { v } from "convex/values";
-import { query, mutation, action, internalMutation, internalAction } from "./_generated/server";
+import { query, mutation, action, internalMutation, internalAction, internalQuery } from "./_generated/server";
 import { api, internal } from "./_generated/api";
 import { rag } from "./functions/rag";
+import type { EntryId } from "@convex-dev/rag";
 
 // Helper function to get or create conversation for participant
 const getOrCreateConversation = async (ctx: any, participantId: any) => {
@@ -975,7 +976,19 @@ export const uploadKnowledgeDocument = mutation({
   handler: async (ctx, args) => {
     const namespace = args.namespace || "global_knowledge";
 
-    // Insert document record with namespace
+    // Replace any prior local row with the same (namespace, source) so the admin
+    // list stays in sync. The RAG-side replacement happens via the `key` param in
+    // processDocumentForRAG, so we can drop the old local row safely.
+    const previous = await ctx.db
+      .query("knowledge_docs")
+      .withIndex("by_namespace", (q) => q.eq("namespace", namespace))
+      .collect();
+    for (const doc of previous) {
+      if (doc.source === args.source) {
+        await ctx.db.delete(doc._id);
+      }
+    }
+
     const documentId = await ctx.db.insert("knowledge_docs", {
       title: args.title,
       source: args.source,
@@ -985,7 +998,6 @@ export const uploadKnowledgeDocument = mutation({
       createdAt: Date.now(),
     });
 
-    // Schedule RAG processing asynchronously
     await ctx.scheduler.runAfter(0, internal.admin.processDocumentForRAG, {
       documentId,
       content: args.content,
@@ -993,6 +1005,7 @@ export const uploadKnowledgeDocument = mutation({
       format: args.format,
       hash: args.hash,
       namespace,
+      source: args.source,
     });
 
     return documentId;
@@ -1008,14 +1021,17 @@ export const processDocumentForRAG = internalAction({
     format: v.union(v.literal("pdf"), v.literal("txt"), v.literal("md")),
     hash: v.string(),
     namespace: v.optional(v.string()),
+    source: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     try {
       const namespace = args.namespace || "global_knowledge";
 
-      // Process document with RAG system directly
+      // `key` makes rag.add replace any prior entry with the same key in the
+      // namespace — this is what prevents stale embeddings on re-upload.
       const result = await rag.add(ctx, {
         namespace,
+        key: args.source ?? args.title,
         title: args.title,
         contentHash: args.hash,
         text: args.content,
@@ -1025,16 +1041,14 @@ export const processDocumentForRAG = internalAction({
         },
       });
 
-      // Mark document as successfully ingested
-      await ctx.runMutation(internal.admin.updateDocumentStatus, {
+      await ctx.runMutation(internal.admin.updateDocumentRagEntry, {
         documentId: args.documentId,
+        ragEntryId: result.entryId,
         status: "ingested",
       });
       return result;
     } catch (error) {
       console.error("RAG processing failed:", error);
-      
-      // Mark document as failed
       await ctx.runMutation(internal.admin.updateDocumentStatus, {
         documentId: args.documentId,
         status: "failed",
@@ -1056,22 +1070,46 @@ export const updateDocumentStatus = internalMutation({
   },
 });
 
+export const updateDocumentRagEntry = internalMutation({
+  args: {
+    documentId: v.id("knowledge_docs"),
+    ragEntryId: v.string(),
+    status: v.union(v.literal("pending"), v.literal("ingested"), v.literal("failed")),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.documentId, {
+      ragEntryId: args.ragEntryId,
+      status: args.status,
+    });
+  },
+});
+
 export const deleteKnowledgeDocument = mutation({
   args: {
     documentId: v.id("knowledge_docs"),
   },
   handler: async (ctx, args) => {
-    // Delete associated chunks first
+    const doc = await ctx.db.get(args.documentId);
+    if (!doc) {
+      return;
+    }
+
+    // Remove the RAG entry first so embeddings stop appearing in bot search.
+    // Without this the embeddings persist in the @convex-dev/rag component's
+    // own tables even after the local row is gone.
+    if (doc.ragEntryId) {
+      await rag.deleteAsync(ctx, { entryId: doc.ragEntryId as EntryId });
+    }
+
+    // Legacy chunks table is no longer populated, but old rows may exist.
     const chunks = await ctx.db
       .query("knowledge_chunks")
       .withIndex("by_doc", (q) => q.eq("docId", args.documentId))
       .collect();
-    
     for (const chunk of chunks) {
       await ctx.db.delete(chunk._id);
     }
 
-    // Delete the document
     await ctx.db.delete(args.documentId);
   },
 });
@@ -1081,42 +1119,91 @@ export const reindexDocument = mutation({
     documentId: v.id("knowledge_docs"),
   },
   handler: async (ctx, args) => {
-    // Get the document
     const document = await ctx.db.get(args.documentId);
     if (!document) {
       throw new Error("Document not found");
     }
 
-    // Mark as pending and schedule reprocessing
-    await ctx.db.patch(args.documentId, {
-      status: "pending",
-    });
-
-    // Note: We would need to store the original content to reindex
-    // For now, we'll just mark it as ingested
-    // In a full implementation, we'd store the content and reprocess it
-    await ctx.db.patch(args.documentId, {
-      status: "ingested",
-    });
-
-    return args.documentId;
+    // Original document content isn't persisted, so we can't re-embed without
+    // a re-upload. Fail loudly instead of silently flipping status (which used
+    // to make the UI claim success while embeddings stayed stale).
+    throw new Error(
+      "Reindex requires re-uploading the document — original content is not stored on the server.",
+    );
   },
 });
 
 export const reindexAllDocuments = mutation({
   args: {},
   handler: async (ctx) => {
-    const documents = await ctx.db
-      .query("knowledge_docs")
-      .collect();
+    throw new Error(
+      "Reindex-all requires re-uploading documents — original content is not stored on the server.",
+    );
+  },
+});
 
-    for (const doc of documents) {
-      await ctx.db.patch(doc._id, {
-        status: "pending",
-      });
+// Internal query used by the orphan purge action below.
+export const listKnowledgeDocsByNamespace = internalQuery({
+  args: { namespace: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("knowledge_docs")
+      .withIndex("by_namespace", (q) => q.eq("namespace", args.namespace))
+      .collect();
+  },
+});
+
+/**
+ * Deletes RAG entries in a namespace whose `key` no longer matches a row in
+ * `knowledge_docs` for that namespace. Use this once to clean up embeddings
+ * left over from the previous buggy delete/re-upload flow.
+ */
+export const purgeOrphanRagEntries = action({
+  args: {
+    namespace: v.string(),
+    dryRun: v.optional(v.boolean()),
+  },
+  returns: v.object({
+    inspected: v.number(),
+    deleted: v.number(),
+    orphanKeys: v.array(v.string()),
+  }),
+  handler: async (ctx, args) => {
+    const ns = await rag.getNamespace(ctx, { namespace: args.namespace });
+    if (!ns) {
+      return { inspected: 0, deleted: 0, orphanKeys: [] };
     }
 
-    // TODO: Trigger background reprocessing jobs for all documents
+    const localDocs: Array<{ source: string }> = await ctx.runQuery(
+      internal.admin.listKnowledgeDocsByNamespace,
+      { namespace: args.namespace },
+    );
+    const validKeys = new Set(localDocs.map((d) => d.source));
+
+    let inspected = 0;
+    let deleted = 0;
+    const orphanKeys: string[] = [];
+    let cursor: string | null = null;
+    while (true) {
+      const page: any = await rag.list(ctx, {
+        namespaceId: ns.namespaceId,
+        paginationOpts: { numItems: 100, cursor },
+      });
+      for (const entry of page.page) {
+        inspected++;
+        if (!entry.key || !validKeys.has(entry.key)) {
+          orphanKeys.push(entry.key ?? `<no-key:${entry.entryId}>`);
+          if (!args.dryRun) {
+            await rag.delete(ctx, { entryId: entry.entryId });
+            deleted++;
+          }
+        }
+      }
+      if (page.isDone) break;
+      cursor = page.continueCursor;
+    }
+
+    return { inspected, deleted, orphanKeys };
   },
 });
 

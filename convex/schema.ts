@@ -413,6 +413,7 @@ const applicationTables = {
     tags: v.array(v.string()), // Document tags
     status: v.union(v.literal("ingested"), v.literal("pending"), v.literal("failed")), // Processing status
     createdAt: v.number(), // Upload timestamp
+    ragEntryId: v.optional(v.string()), // Entry id in the @convex-dev/rag component — needed to delete embeddings
   })
     .index("by_tenant", ["tenantId"])
     .index("by_bot", ["botId"])
