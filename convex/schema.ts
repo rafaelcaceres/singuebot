@@ -414,6 +414,9 @@ const applicationTables = {
     status: v.union(v.literal("ingested"), v.literal("pending"), v.literal("failed")), // Processing status
     createdAt: v.number(), // Upload timestamp
     ragEntryId: v.optional(v.string()), // Entry id in the @convex-dev/rag component — needed to delete embeddings
+    content: v.optional(v.string()), // Raw extracted text — kept so reindex can re-embed without a fresh upload
+    contentHash: v.optional(v.string()), // Hash of the stored content
+    format: v.optional(v.union(v.literal("pdf"), v.literal("txt"), v.literal("md"))),
   })
     .index("by_tenant", ["tenantId"])
     .index("by_bot", ["botId"])

@@ -996,6 +996,9 @@ export const uploadKnowledgeDocument = mutation({
       namespace,
       status: "pending",
       createdAt: Date.now(),
+      content: args.content,
+      contentHash: args.hash,
+      format: args.format,
     });
 
     await ctx.scheduler.runAfter(0, internal.admin.processDocumentForRAG, {
@@ -1070,6 +1073,24 @@ export const updateDocumentStatus = internalMutation({
   },
 });
 
+export const deleteKnowledgeDocByRagEntry = internalMutation({
+  args: {
+    namespace: v.string(),
+    ragEntryId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const docs = await ctx.db
+      .query("knowledge_docs")
+      .withIndex("by_namespace", (q) => q.eq("namespace", args.namespace))
+      .collect();
+    for (const doc of docs) {
+      if (doc.ragEntryId === args.ragEntryId) {
+        await ctx.db.delete(doc._id);
+      }
+    }
+  },
+});
+
 export const updateDocumentRagEntry = internalMutation({
   args: {
     documentId: v.id("knowledge_docs"),
@@ -1123,22 +1144,23 @@ export const reindexDocument = mutation({
     if (!document) {
       throw new Error("Document not found");
     }
+    if (!document.content) {
+      throw new Error(
+        "Document was uploaded before reindexing was supported — please re-upload it.",
+      );
+    }
 
-    // Original document content isn't persisted, so we can't re-embed without
-    // a re-upload. Fail loudly instead of silently flipping status (which used
-    // to make the UI claim success while embeddings stayed stale).
-    throw new Error(
-      "Reindex requires re-uploading the document — original content is not stored on the server.",
-    );
-  },
-});
-
-export const reindexAllDocuments = mutation({
-  args: {},
-  handler: async (ctx) => {
-    throw new Error(
-      "Reindex-all requires re-uploading documents — original content is not stored on the server.",
-    );
+    await ctx.db.patch(args.documentId, { status: "pending" });
+    await ctx.scheduler.runAfter(0, internal.admin.processDocumentForRAG, {
+      documentId: args.documentId,
+      content: document.content,
+      title: document.title,
+      format: document.format ?? "txt",
+      hash: document.contentHash ?? `${args.documentId}-${Date.now()}`,
+      namespace: document.namespace,
+      source: document.source,
+    });
+    return args.documentId;
   },
 });
 
@@ -1150,6 +1172,213 @@ export const listKnowledgeDocsByNamespace = internalQuery({
       .query("knowledge_docs")
       .withIndex("by_namespace", (q) => q.eq("namespace", args.namespace))
       .collect();
+  },
+});
+
+export const markDocumentPending = internalMutation({
+  args: { documentId: v.id("knowledge_docs") },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.documentId, { status: "pending" });
+  },
+});
+
+/**
+ * Scans every chunk in a namespace for a substring (case-insensitive) and
+ * optionally deletes the entries that contain it.
+ *
+ * Useful as an emergency tool: e.g. an incorrect phone number was indexed
+ * and you need to surgically purge it without re-uploading the whole base.
+ *
+ * - `dryRun: true` (default) — only reports matches, no deletion.
+ * - `dryRun: false` — deletes the entire RAG entry and its local knowledge_docs
+ *   row. Re-upload the corrected version afterwards.
+ */
+export const findKnowledgeByText = action({
+  args: {
+    namespace: v.string(),
+    searchText: v.string(),
+    dryRun: v.optional(v.boolean()),
+  },
+  returns: v.object({
+    matches: v.array(v.object({
+      entryId: v.string(),
+      key: v.optional(v.string()),
+      title: v.optional(v.string()),
+      chunkOrder: v.number(),
+      snippet: v.string(),
+    })),
+    entriesDeleted: v.number(),
+  }),
+  handler: async (ctx, args) => {
+    if (!args.searchText.trim()) {
+      throw new Error("searchText cannot be empty");
+    }
+    const needle = args.searchText.toLowerCase();
+    const dryRun = args.dryRun ?? true;
+
+    const ns = await rag.getNamespace(ctx, { namespace: args.namespace });
+    if (!ns) {
+      return { matches: [], entriesDeleted: 0 };
+    }
+
+    const matches: Array<{
+      entryId: string;
+      key?: string;
+      title?: string;
+      chunkOrder: number;
+      snippet: string;
+    }> = [];
+    const matchedEntryIds = new Set<string>();
+    const entryMeta = new Map<string, { key?: string; title?: string }>();
+
+    // Iterate every entry in the namespace.
+    let entryCursor: string | null = null;
+    while (true) {
+      const entryPage: any = await rag.list(ctx, {
+        namespaceId: ns.namespaceId,
+        paginationOpts: { numItems: 100, cursor: entryCursor },
+      });
+
+      for (const entry of entryPage.page) {
+        entryMeta.set(entry.entryId, { key: entry.key, title: entry.title });
+
+        // Paginate this entry's chunks.
+        let chunkCursor: string | null = null;
+        while (true) {
+          const chunkPage: any = await rag.listChunks(ctx, {
+            entryId: entry.entryId,
+            paginationOpts: { numItems: 100, cursor: chunkCursor },
+          });
+          for (const chunk of chunkPage.page) {
+            const text: string = chunk.text ?? "";
+            const idx = text.toLowerCase().indexOf(needle);
+            if (idx !== -1) {
+              const start = Math.max(0, idx - 40);
+              const end = Math.min(text.length, idx + args.searchText.length + 40);
+              matches.push({
+                entryId: entry.entryId,
+                key: entry.key,
+                title: entry.title,
+                chunkOrder: chunk.order,
+                snippet: (start > 0 ? "…" : "") + text.slice(start, end) + (end < text.length ? "…" : ""),
+              });
+              matchedEntryIds.add(entry.entryId);
+            }
+          }
+          if (chunkPage.isDone) break;
+          chunkCursor = chunkPage.continueCursor;
+        }
+      }
+      if (entryPage.isDone) break;
+      entryCursor = entryPage.continueCursor;
+    }
+
+    let entriesDeleted = 0;
+    if (!dryRun) {
+      for (const entryId of matchedEntryIds) {
+        await rag.delete(ctx, { entryId: entryId as EntryId });
+        await ctx.runMutation(internal.admin.deleteKnowledgeDocByRagEntry, {
+          namespace: args.namespace,
+          ragEntryId: entryId,
+        });
+        entriesDeleted++;
+      }
+    }
+
+    return { matches, entriesDeleted };
+  },
+});
+
+/**
+ * Full rebuild for a namespace:
+ *   1. delete every RAG entry whose `key` no longer maps to a local doc;
+ *   2. re-add each local doc (rag.add with `key` replaces the prior entry).
+ * Docs without stored content (uploaded before this feature shipped) are
+ * skipped and reported back so the operator knows to re-upload them.
+ */
+export const reindexNamespace = action({
+  args: {
+    namespace: v.string(),
+  },
+  returns: v.object({
+    orphansDeleted: v.number(),
+    reindexed: v.number(),
+    skipped: v.array(v.object({ documentId: v.id("knowledge_docs"), title: v.string(), reason: v.string() })),
+    failed: v.array(v.object({ documentId: v.id("knowledge_docs"), title: v.string(), error: v.string() })),
+  }),
+  handler: async (ctx, args) => {
+    const docs: Array<any> = await ctx.runQuery(
+      internal.admin.listKnowledgeDocsByNamespace,
+      { namespace: args.namespace },
+    );
+    const validKeys = new Set(docs.map((d) => d.source));
+
+    // 1. Purge orphans.
+    let orphansDeleted = 0;
+    const ns = await rag.getNamespace(ctx, { namespace: args.namespace });
+    if (ns) {
+      let cursor: string | null = null;
+      while (true) {
+        const page: any = await rag.list(ctx, {
+          namespaceId: ns.namespaceId,
+          paginationOpts: { numItems: 100, cursor },
+        });
+        for (const entry of page.page) {
+          if (!entry.key || !validKeys.has(entry.key)) {
+            await rag.delete(ctx, { entryId: entry.entryId });
+            orphansDeleted++;
+          }
+        }
+        if (page.isDone) break;
+        cursor = page.continueCursor;
+      }
+    }
+
+    // 2. Re-add every doc that still has content stored.
+    const skipped: Array<{ documentId: any; title: string; reason: string }> = [];
+    const failed: Array<{ documentId: any; title: string; error: string }> = [];
+    let reindexed = 0;
+
+    for (const doc of docs) {
+      if (!doc.content) {
+        skipped.push({
+          documentId: doc._id,
+          title: doc.title,
+          reason: "no stored content — re-upload required",
+        });
+        continue;
+      }
+      try {
+        await ctx.runMutation(internal.admin.markDocumentPending, { documentId: doc._id });
+        const result = await rag.add(ctx, {
+          namespace: args.namespace,
+          key: doc.source,
+          title: doc.title,
+          contentHash: doc.contentHash ?? `${doc._id}-${Date.now()}`,
+          text: doc.content,
+          metadata: {
+            format: doc.format ?? "txt",
+            uploadedAt: Date.now(),
+            reindexed: true,
+          },
+        });
+        await ctx.runMutation(internal.admin.updateDocumentRagEntry, {
+          documentId: doc._id,
+          ragEntryId: result.entryId,
+          status: "ingested",
+        });
+        reindexed++;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        await ctx.runMutation(internal.admin.updateDocumentStatus, {
+          documentId: doc._id,
+          status: "failed",
+        });
+        failed.push({ documentId: doc._id, title: doc.title, error: message });
+      }
+    }
+
+    return { orphansDeleted, reindexed, skipped, failed };
   },
 });
 

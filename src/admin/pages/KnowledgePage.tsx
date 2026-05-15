@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
@@ -39,9 +39,11 @@ export const KnowledgePage: React.FC = () => {
   const documents = useQuery(api.admin.getKnowledgeDocuments, { namespace }) || [];
   const processingJobs = useQuery(api.admin.getProcessingJobs) || [];
   
-  // Mutations
+  // Mutations & actions
   const deleteDocument = useMutation(api.admin.deleteKnowledgeDocument);
   const reindexDocument = useMutation(api.admin.reindexDocument);
+  const reindexNamespace = useAction(api.admin.reindexNamespace);
+  const [isReindexingAll, setIsReindexingAll] = useState(false);
 
   const handleDeleteDocument = async (documentId: string) => {
     try {
@@ -77,24 +79,45 @@ export const KnowledgePage: React.FC = () => {
   };
 
   const handleReindexAll = async () => {
-    try {
-      // For now, we'll reindex all documents individually
-      // since there's no reindexAll function in the backend
-      const allDocs = documents || [];
-      for (const doc of allDocs) {
-        await reindexDocument({ documentId: doc._id });
-      }
+    if (!namespace) {
       toast({
-        title: "Reindexação geral iniciada",
-        description: "Todos os documentos serão reprocessados.",
+        title: "Bot não configurado",
+        description: "Selecione um bot com namespace RAG configurado.",
+        variant: "destructive",
       });
+      return;
+    }
+    if (!window.confirm(
+      "Isso vai apagar embeddings órfãos e reprocessar todos os documentos da base. Continuar?"
+    )) {
+      return;
+    }
+    setIsReindexingAll(true);
+    try {
+      const result = await reindexNamespace({ namespace });
+      const parts = [
+        `${result.reindexed} reindexados`,
+        `${result.orphansDeleted} órfãos removidos`,
+      ];
+      if (result.skipped.length > 0) parts.push(`${result.skipped.length} sem conteúdo (re-upload)`);
+      if (result.failed.length > 0) parts.push(`${result.failed.length} falharam`);
+      toast({
+        title: "Reindexação concluída",
+        description: parts.join(" • "),
+        variant: result.failed.length > 0 ? "destructive" : "default",
+      });
+      if (result.skipped.length > 0 || result.failed.length > 0) {
+        console.warn("Reindex report", result);
+      }
     } catch (error) {
       toast({
         title: "Erro na reindexação",
-        description: "Não foi possível iniciar a reindexação geral.",
+        description: error instanceof Error ? error.message : "Falha desconhecida.",
         variant: "destructive",
       });
       console.error("Error reindexing all documents:", error);
+    } finally {
+      setIsReindexingAll(false);
     }
   };
 
@@ -152,10 +175,10 @@ export const KnowledgePage: React.FC = () => {
           <Button
             variant="outline"
             onClick={() => void handleReindexAll()}
-            disabled={documents.length === 0}
+            disabled={documents.length === 0 || !namespace || isReindexingAll}
           >
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Reindexar Tudo
+            <RefreshCw className={`h-4 w-4 mr-2 ${isReindexingAll ? "animate-spin" : ""}`} />
+            {isReindexingAll ? "Reindexando..." : "Reindexar Tudo"}
           </Button>
         </div>
       </div>
