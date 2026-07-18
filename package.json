@@ -9,7 +9,8 @@
     "dev:backend": "convex dev",
     "build": "vite build",
     "lint": "tsc -p convex -noEmit --pretty false && tsc -p . -noEmit --pretty false && convex dev --once && vite build",
-    "index-participants": "tsx scripts/index-participants.ts"
+    "index-participants": "tsx scripts/index-participants.ts",
+    "purge-rag-text": "tsx scripts/purge-rag-text.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^2.0.32",

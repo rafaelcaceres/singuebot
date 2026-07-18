@@ -1324,7 +1324,10 @@ export const reindexNamespace = action({
           paginationOpts: { numItems: 100, cursor },
         });
         for (const entry of page.page) {
-          if (!entry.key || !validKeys.has(entry.key)) {
+          // Conservative: only delete entries that have a key AND whose key
+          // doesn't match any local doc. Pre-fix legacy entries (no key) are
+          // left alone — operator should remove them via findKnowledgeByText.
+          if (entry.key && !validKeys.has(entry.key)) {
             await rag.delete(ctx, { entryId: entry.entryId });
             orphansDeleted++;
           }
@@ -1420,8 +1423,11 @@ export const purgeOrphanRagEntries = action({
       });
       for (const entry of page.page) {
         inspected++;
-        if (!entry.key || !validKeys.has(entry.key)) {
-          orphanKeys.push(entry.key ?? `<no-key:${entry.entryId}>`);
+        // Only treat as orphan if it has a key AND the key doesn't match any
+        // local doc. Entries without a key are pre-fix legacy data — we don't
+        // know how to map them, so leave them alone to avoid wiping prod.
+        if (entry.key && !validKeys.has(entry.key)) {
+          orphanKeys.push(entry.key);
           if (!args.dryRun) {
             await rag.delete(ctx, { entryId: entry.entryId });
             deleted++;
