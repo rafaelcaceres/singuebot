@@ -39,6 +39,7 @@ export const getFeatureFlags = query({
     enableInterview: v.boolean(),
     enableClustering: v.boolean(),
     enableTemplates: v.boolean(),
+    enableBroadcasts: v.boolean(),
     enableParticipantRAG: v.boolean(),
     enableRAG: v.boolean(),
     enableCSVImport: v.boolean(),
@@ -54,6 +55,9 @@ export const getFeatureFlags = query({
       enableInterview: bot?.config?.enableInterview ?? false,
       enableClustering: bot?.config?.enableClustering ?? false,
       enableTemplates: bot?.config?.enableTemplates ?? false,
+      // Kept separate from enableTemplates on purpose: managing and syncing
+      // templates should be possible while mass send stays off.
+      enableBroadcasts: bot?.config?.enableBroadcasts ?? false,
       enableParticipantRAG: bot?.config?.enableParticipantRAG ?? false,
       enableRAG: bot?.config?.enableRAG ?? true,
       enableCSVImport: bot?.config?.enableCSVImport ?? false,
@@ -105,6 +109,7 @@ export const updateBotConfig = mutation({
       enableInterview: v.optional(v.boolean()),
       enableClustering: v.optional(v.boolean()),
       enableTemplates: v.optional(v.boolean()),
+      enableBroadcasts: v.optional(v.boolean()),
       enableParticipantRAG: v.optional(v.boolean()),
       enableCSVImport: v.optional(v.boolean()),
       consentRequired: v.optional(v.boolean()),

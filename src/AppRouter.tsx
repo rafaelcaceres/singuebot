@@ -15,6 +15,9 @@ import { ParticipantProfile } from "./admin/pages/ParticipantProfile";
 import { ParticipantClusters } from "./admin/pages/ParticipantClusters";
 import { SettingsPage } from "./admin/pages/SettingsPage";
 import { OperatorDashboard } from "./admin/pages/OperatorDashboard";
+import { Broadcasts } from "./admin/pages/Broadcasts";
+import { BroadcastDetail } from "./admin/pages/BroadcastDetail";
+import { RequireFlag } from "./admin/components/RequireFlag";
 
 function ImportPage() {
   return <div className="p-8">Importar CSV - Em desenvolvimento</div>;
@@ -90,7 +93,32 @@ export function AppRouter() {
           <Route path="conversations" element={<Conversations />} />
           <Route path="knowledge" element={<KnowledgePage />} />
           <Route path="users" element={<UserManagement />} />
-          <Route path="templates" element={<TemplatesPage />} />
+          {/* Feature flags gate the route itself, not just the nav link — the nav
+              item was already flag-gated while the URL stayed reachable. */}
+          <Route
+            path="templates"
+            element={
+              <RequireFlag flag="enableTemplates">
+                <TemplatesPage />
+              </RequireFlag>
+            }
+          />
+          <Route
+            path="broadcasts"
+            element={
+              <RequireFlag flag="enableBroadcasts">
+                <Broadcasts />
+              </RequireFlag>
+            }
+          />
+          <Route
+            path="broadcasts/:id"
+            element={
+              <RequireFlag flag="enableBroadcasts">
+                <BroadcastDetail />
+              </RequireFlag>
+            }
+          />
           <Route path="import" element={<ImportPage />} />
           <Route path="jobs" element={<JobsPage />} />
           <Route path="settings" element={<SettingsPage />} />

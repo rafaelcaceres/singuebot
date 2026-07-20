@@ -75,16 +75,25 @@ http.route({
       
       const messageId = params.get("MessageSid");
       const status = params.get("MessageStatus");
+      const errorCode = params.get("ErrorCode");
 
       if (messageId && status) {
         // Map Twilio status to our expected values
-        const mappedStatus = status === "queued" || status === "accepted" ? "sent" : 
-                           status === "undelivered" ? "failed" : 
+        const mappedStatus = status === "queued" || status === "accepted" ? "sent" :
+                           status === "undelivered" ? "failed" :
                            status as "received" | "processing" | "sent" | "delivered" | "read" | "failed";
 
         await ctx.runMutation(api.whatsapp.updateMessageStatus, {
           messageId,
           status: mappedStatus,
+        });
+
+        // Broadcast recipients track their own delivery state so the detail page
+        // can show delivered/read counts and group failures by Twilio error code.
+        await ctx.runMutation(internal.functions.broadcasts.updateRecipientByMessageSid, {
+          messageSid: messageId,
+          status,
+          errorCode: errorCode ? Number(errorCode) : undefined,
         });
       }
 

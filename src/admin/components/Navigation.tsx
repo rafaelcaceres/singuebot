@@ -17,10 +17,11 @@ import {
   Headphones,
   BarChart3,
   Sparkles,
-  Network
+  Network,
+  Megaphone
 } from "lucide-react";
 
-type FeatureFlagKey = "enableInterview" | "enableClustering" | "enableTemplates" | "enableParticipantRAG" | "enableCSVImport";
+type FeatureFlagKey = "enableInterview" | "enableClustering" | "enableTemplates" | "enableBroadcasts" | "enableParticipantRAG" | "enableCSVImport";
 
 interface MenuItem {
   title: string;
@@ -102,6 +103,13 @@ const menuItems: MenuItem[] = [
     icon: MessageCircle,
     roles: ["owner", "editor"],
     featureFlag: "enableTemplates",
+  },
+  {
+    title: "Disparos",
+    href: "/broadcasts",
+    icon: Megaphone,
+    roles: ["owner", "editor"],
+    featureFlag: "enableBroadcasts",
   },
   {
     title: "Importar CSV",

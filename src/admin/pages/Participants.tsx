@@ -15,10 +15,11 @@ import {
 } from '@tanstack/react-table';
 import { Plus, MessageSquare, Upload } from 'lucide-react';
 import { api } from '../../../convex/_generated/api';
+import { Id } from '../../../convex/_generated/dataModel';
 import { ConversationViewer } from '../components/ConversationViewer';
 import { AddParticipantForm } from '../components/AddParticipantForm';
 import { EditParticipantForm } from '../components/EditParticipantForm';
-import { TemplateModal } from '../components/TemplateModal';
+import { BroadcastComposer } from '../components/BroadcastComposer';
 import { ImportParticipantsModal } from '../components/ImportParticipantsModal';
 import { usePermissions } from '../../hooks/useAuth';
 
@@ -55,7 +56,7 @@ export const Participants: React.FC = () => {
   
   // Multi-selection state
   const [selectedParticipants, setSelectedParticipants] = useState<Set<string>>(new Set());
-  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   // Filters state
@@ -75,24 +76,36 @@ export const Participants: React.FC = () => {
   // Mutations
   const deleteParticipantMutation = useMutation(api.admin.deleteParticipant);
 
-  // Selection handlers
+  // Selection handlers.
+  // Selection spans pages: the header checkbox unions/removes only the current page
+  // rather than replacing the whole set, so paginating no longer silently drops
+  // rows while the button keeps showing the full count.
   const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      const allIds = new Set(participantsData?.participants?.map(p => p._id) || []);
-      setSelectedParticipants(allIds);
-    } else {
-      setSelectedParticipants(new Set());
-    }
+    const pageIds = participantsData?.participants?.map(p => p._id) || [];
+    setSelectedParticipants(prev => {
+      const next = new Set(prev);
+      if (checked) {
+        pageIds.forEach(id => next.add(id));
+      } else {
+        pageIds.forEach(id => next.delete(id));
+      }
+      return next;
+    });
   };
 
+  // Functional update, not `new Set(selectedParticipants)`: the captured value goes
+  // stale between clicks that land in the same render, silently dropping all but
+  // the last one.
   const handleSelectParticipant = (participantId: string, checked: boolean) => {
-    const newSelection = new Set(selectedParticipants);
-    if (checked) {
-      newSelection.add(participantId);
-    } else {
-      newSelection.delete(participantId);
-    }
-    setSelectedParticipants(newSelection);
+    setSelectedParticipants(prev => {
+      const next = new Set(prev);
+      if (checked) {
+        next.add(participantId);
+      } else {
+        next.delete(participantId);
+      }
+      return next;
+    });
   };
 
   const isAllSelected = (participantsData?.participants?.length ?? 0) > 0 && 
@@ -344,11 +357,11 @@ export const Participants: React.FC = () => {
         <div className="flex space-x-3">
           {selectedParticipants.size > 0 && (
             <button
-              onClick={() => setIsTemplateModalOpen(true)}
+              onClick={() => setIsComposerOpen(true)}
               className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 flex items-center gap-2"
             >
               <MessageSquare className="h-4 w-4" />
-              Enviar Template ({selectedParticipants.size})
+              Criar disparo ({selectedParticipants.size})
             </button>
           )}
           {canManageUsers && (
@@ -585,13 +598,13 @@ export const Participants: React.FC = () => {
         }}
       />
 
-      {/* Template Modal */}
-      <TemplateModal
-        open={isTemplateModalOpen}
-        onOpenChange={setIsTemplateModalOpen}
-        selectedParticipants={
-          participantsData?.participants?.filter(p => selectedParticipants.has(p._id)) || []
-        }
+      {/* Broadcast composer.
+          Receives the ids directly rather than participant docs filtered from the
+          current page, so a selection built across several pages stays intact. */}
+      <BroadcastComposer
+        open={isComposerOpen}
+        onOpenChange={setIsComposerOpen}
+        participantIds={[...selectedParticipants] as Id<'participants'>[]}
       />
     </div>
   );

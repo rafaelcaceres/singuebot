@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useQuery, useMutation } from 'convex/react';
+import { useQuery, useMutation, useAction } from 'convex/react';
 import {
   useReactTable,
   getCoreRowModel,
@@ -12,11 +12,9 @@ import {
   type SortingState,
   type ColumnFiltersState,
 } from '@tanstack/react-table';
-import { Plus, Edit, Trash2, Search, Settings } from 'lucide-react';
+import { RefreshCw, Trash2, Search, Settings } from 'lucide-react';
 import { api } from '../../../convex/_generated/api';
 import { Id } from '../../../convex/_generated/dataModel';
-import { AddTemplateModal } from '../components/AddTemplateModal';
-import { EditTemplateModal } from '../components/EditTemplateModal';
 import { DeleteConfirmationModal } from '../components/DeleteConfirmationModal';
 import { TemplateConfigModal } from '../components/TemplateConfigModal';
 import { usePermissions } from '../../hooks/useAuth';
@@ -28,8 +26,36 @@ interface Template {
   twilioId: string;
   variables: string[];
   stage: string;
+  approvalStatus?: string;
+  contentType?: string;
+  syncedAt?: number;
+  twilioStructure?: { body?: string };
   _creationTime: number;
 }
+
+interface SyncResult {
+  scanned: number;
+  created: number;
+  updated: number;
+  archived: number;
+  conflicts: Array<{ twilioId: string; friendlyName: string; reason: string }>;
+}
+
+const APPROVAL_STYLES: Record<string, string> = {
+  approved: 'bg-green-100 text-green-800',
+  pending: 'bg-yellow-100 text-yellow-800',
+  rejected: 'bg-red-100 text-red-800',
+  unsubmitted: 'bg-gray-100 text-gray-700',
+  archived_remote: 'bg-orange-100 text-orange-800',
+};
+
+const APPROVAL_LABELS: Record<string, string> = {
+  approved: 'Aprovado',
+  pending: 'Em análise',
+  rejected: 'Rejeitado',
+  unsubmitted: 'Não enviado',
+  archived_remote: 'Removido no Twilio',
+};
 
 const columnHelper = createColumnHelper<Template>();
 
@@ -43,17 +69,39 @@ export const TemplatesPage: React.FC = () => {
   });
 
   // Modal states
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
   const [deletingTemplate, setDeletingTemplate] = useState<Template | null>(null);
   const [configuringTemplate, setConfiguringTemplate] = useState<Template | null>(null);
+
+  // Sync state
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   // Permissions
   const { canManageUsers } = usePermissions();
 
   // Data fetching
-  const templates = useQuery(api.admin.getTemplates) || [];
+  const templates = (useQuery(api.admin.getTemplates) || []) as Template[];
   const deleteTemplate = useMutation(api.admin.deleteTemplate);
+  const syncTemplates = useAction(api.functions.templateSync.syncTemplatesFromTwilio);
+
+  const lastSyncedAt = useMemo(() => {
+    const stamps = templates.map((t) => t.syncedAt ?? 0).filter(Boolean);
+    return stamps.length ? Math.max(...stamps) : null;
+  }, [templates]);
+
+  const handleSync = async () => {
+    setIsSyncing(true);
+    setSyncError(null);
+    setSyncResult(null);
+    try {
+      setSyncResult(await syncTemplates({}));
+    } catch (error) {
+      setSyncError(error instanceof Error ? error.message : 'Erro ao sincronizar');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const columns = useMemo(() => [
     columnHelper.accessor('name', {
@@ -72,13 +120,33 @@ export const TemplatesPage: React.FC = () => {
         </span>
       ),
     }),
-    columnHelper.accessor('stage', {
-      header: 'Estágio',
-      cell: (info) => (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-          {info.getValue()}
-        </span>
-      ),
+    columnHelper.accessor('approvalStatus', {
+      header: 'Aprovação',
+      cell: (info) => {
+        const status = info.getValue() ?? 'unsubmitted';
+        return (
+          <span
+            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+              APPROVAL_STYLES[status] ?? 'bg-gray-100 text-gray-700'
+            }`}
+          >
+            {APPROVAL_LABELS[status] ?? status}
+          </span>
+        );
+      },
+    }),
+    columnHelper.display({
+      id: 'body',
+      header: 'Mensagem',
+      cell: (info) => {
+        const body = info.row.original.twilioStructure?.body;
+        if (!body) return <span className="text-xs text-gray-400">—</span>;
+        return (
+          <p className="text-xs text-gray-600 max-w-sm line-clamp-2" title={body}>
+            {body}
+          </p>
+        );
+      },
     }),
     columnHelper.accessor('variables', {
       header: 'Variáveis',
@@ -175,21 +243,53 @@ export const TemplatesPage: React.FC = () => {
         <div className="sm:flex-auto">
           <h1 className="text-2xl font-semibold text-gray-900">Templates HSM</h1>
           <p className="mt-2 text-sm text-gray-700">
-            Gerencie os templates de mensagens do WhatsApp Business API.
+            Templates são criados e aprovados no Twilio. Aqui você os sincroniza e
+            define de quais campos do participante cada variável é preenchida.
           </p>
+          {lastSyncedAt && (
+            <p className="mt-1 text-xs text-gray-500">
+              Última sincronização: {new Date(lastSyncedAt).toLocaleString('pt-BR')}
+            </p>
+          )}
         </div>
         {canManageUsers && (
           <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
             <button
-              onClick={() => setIsAddModalOpen(true)}
-              className="inline-flex items-center justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:w-auto"
+              onClick={() => void handleSync()}
+              disabled={isSyncing}
+              className="inline-flex items-center justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 sm:w-auto"
             >
-              <Plus className="h-4 w-4 mr-2" />
-              Novo Template
+              <RefreshCw className={`h-4 w-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
+              {isSyncing ? 'Sincronizando...' : 'Sincronizar do Twilio'}
             </button>
           </div>
         )}
       </div>
+
+      {syncError && (
+        <div className="mt-4 rounded-md bg-red-50 p-4 text-sm text-red-800">
+          {syncError}
+        </div>
+      )}
+
+      {syncResult && (
+        <div className="mt-4 rounded-md bg-blue-50 p-4">
+          <p className="text-sm text-blue-900">
+            {syncResult.scanned} template(s) lidos no Twilio · {syncResult.created} novo(s) ·{' '}
+            {syncResult.updated} atualizado(s)
+            {syncResult.archived > 0 && ` · ${syncResult.archived} não existe(m) mais no Twilio`}
+          </p>
+          {syncResult.conflicts.length > 0 && (
+            <ul className="mt-2 space-y-1 text-xs text-blue-800">
+              {syncResult.conflicts.map((conflict, index) => (
+                <li key={index}>
+                  <strong>{conflict.friendlyName}:</strong> {conflict.reason}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {/* Search and Filters */}
       <div className="mt-6 flex flex-col sm:flex-row gap-4">
@@ -325,22 +425,11 @@ export const TemplatesPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Modals */}
-      {isAddModalOpen && (
-        <AddTemplateModal
-          open={isAddModalOpen}
-          onOpenChange={setIsAddModalOpen}
-        />
-      )}
-
-      {editingTemplate && (
-        <EditTemplateModal
-          open={!!editingTemplate}
-          onOpenChange={(open) => !open && setEditingTemplate(null)}
-          template={editingTemplate}
-        />
-      )}
-
+      {/* Modals.
+          Manual create/edit was removed: a template body typed here that Twilio has
+          never seen cannot be sent, so the form could only ever mislead. Templates
+          come from "Sincronizar do Twilio"; what stays editable is the variable
+          mapping, in TemplateConfigModal. */}
       {deletingTemplate && (
         <DeleteConfirmationModal
           isOpen={!!deletingTemplate}

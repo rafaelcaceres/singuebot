@@ -49,6 +49,7 @@ const applicationTables = {
       enableInterview: v.optional(v.boolean()), // Enable interview state machine
       enableClustering: v.optional(v.boolean()), // Enable participant clustering/UMAP
       enableTemplates: v.optional(v.boolean()), // Enable HSM template management
+      enableBroadcasts: v.optional(v.boolean()), // Enable proactive mass send (separate from template management)
       enableParticipantRAG: v.optional(v.boolean()), // Enable participant semantic search
       enableCSVImport: v.optional(v.boolean()), // Enable CSV participant import
       consentRequired: v.optional(v.boolean()), // Require LGPD consent before chat
@@ -378,10 +379,15 @@ const applicationTables = {
     locale: v.string(), // Language/locale (pt-BR, en-US)
     twilioId: v.string(), // Twilio HSM template SID
     variables: v.array(v.string()), // Template variable names
-    stage: v.string(), // Interview stage where used
+    stage: v.string(), // Interview stage where used (legacy, overloaded — see approvalStatus)
+    // Twilio Content API sync metadata
+    contentType: v.optional(v.string()), // e.g. "twilio/text", "twilio/quick-reply"
+    approvalStatus: v.optional(v.string()), // WhatsApp approval: approved | pending | rejected | unsubmitted | archived_remote
+    syncedAt: v.optional(v.number()), // Last successful sync from Twilio
     // Variable mapping configuration
     variableMappings: v.optional(v.array(v.object({
       templateVariable: v.string(), // Variable name in template (e.g., "nome", "telefone")
+      contentKey: v.optional(v.string()), // Literal key Twilio expects in ContentVariables (e.g. "1")
       participantField: v.string(), // Field in participant table (e.g., "name", "phone")
       defaultValue: v.optional(v.string()), // Default value if field is empty
       isRequired: v.boolean(), // Whether this mapping is required
@@ -402,6 +408,103 @@ const applicationTables = {
     .index("by_locale", ["locale"])
     .index("by_stage", ["stage"])
     .index("by_twilio_id", ["twilioId"]),
+
+  // Proactive mass send (disparo em massa) — one broadcast per campaign
+  broadcasts: defineTable({
+    label: v.string(), // Human label, e.g. "Convite Evento — 18/07"
+    templateId: v.id("templates"),
+
+    // Immutable snapshot taken at creation: the template may be re-synced mid-run
+    contentSid: v.string(),
+    templateName: v.string(),
+    templateBody: v.optional(v.string()), // For rendering history after the fact
+    mappingsSnapshot: v.array(v.object({
+      contentKey: v.string(), // Literal Twilio key
+      templateVariable: v.string(),
+      participantField: v.optional(v.string()),
+      defaultValue: v.optional(v.string()),
+      isRequired: v.boolean(),
+    })),
+    overrides: v.optional(v.record(v.string(), v.string())), // Admin-typed constants by templateVariable
+
+    // How recipients are chosen. Kept on the doc so enqueueing can resume after a
+    // crash without the client re-sending the selection.
+    selection: v.union(
+      v.object({
+        mode: v.literal("ids"),
+        participantIds: v.array(v.id("participants")),
+      }),
+      v.object({
+        mode: v.literal("filter"),
+        clusterId: v.optional(v.id("clusters")),
+        importSource: v.optional(v.string()),
+        consentOnly: v.optional(v.boolean()),
+      }),
+    ),
+    enqueueCursor: v.optional(v.union(v.string(), v.null())), // filter mode: pagination cursor
+    enqueueOffset: v.optional(v.number()), // ids mode: index into participantIds
+
+    status: v.union(
+      v.literal("draft"),
+      v.literal("enqueueing"),
+      v.literal("running"),
+      v.literal("paused"),
+      v.literal("completed"),
+      v.literal("cancelled"),
+      v.literal("failed"),
+    ),
+
+    // Denormalized counters — the whole progress UI reads only these (O(1), reactive)
+    total: v.number(),
+    sentCount: v.number(),
+    failedCount: v.number(),
+    skippedCount: v.number(),
+
+    ratePerSecond: v.number(), // Throttle; default 5, capped at 20
+    batchSize: v.number(), // Recipients claimed per worker invocation
+    dryRun: v.boolean(), // Runs the entire pipeline but skips the Twilio POST
+
+    createdByEmail: v.optional(v.string()),
+    createdAt: v.number(),
+    startedAt: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
+    lastHeartbeatAt: v.optional(v.number()), // Watchdog input
+    lastError: v.optional(v.string()),
+  })
+    .index("by_status", ["status"])
+    .index("by_created", ["createdAt"])
+    .index("by_status_heartbeat", ["status", "lastHeartbeatAt"]),
+
+  // One document per recipient: keeps status-callback lookup O(1) and avoids the
+  // write contention a chunked-array design would create on every status change.
+  broadcastRecipients: defineTable({
+    broadcastId: v.id("broadcasts"),
+    participantId: v.id("participants"),
+    phone: v.string(), // Normalized snapshot — never re-resolved by phone at send time
+    contentVariables: v.record(v.string(), v.string()), // Resolved at enqueue time
+
+    status: v.union(
+      v.literal("pending"),
+      v.literal("sending"),
+      v.literal("sent"),
+      v.literal("delivered"),
+      v.literal("read"),
+      v.literal("failed"),
+      v.literal("skipped"),
+    ),
+    attempts: v.number(),
+    claimedAt: v.optional(v.number()), // Stale-claim reaping
+    messageSid: v.optional(v.string()),
+    errorCode: v.optional(v.number()), // Twilio numeric code; -1 = unknown/stale claim
+    errorMessage: v.optional(v.string()),
+    skipReason: v.optional(v.string()), // invalid_phone | not_in_allowlist | duplicate_phone
+    sentAt: v.optional(v.number()),
+  })
+    .index("by_broadcast_status", ["broadcastId", "status"])
+    .index("by_broadcast", ["broadcastId"])
+    .index("by_broadcast_phone", ["broadcastId", "phone"]) // dedupe across enqueue chunks
+    .index("by_message_sid", ["messageSid"])
+    .index("by_participant", ["participantId"]),
 
   // Enhanced knowledge_docs table with tenant/bot isolation
   knowledge_docs: defineTable({

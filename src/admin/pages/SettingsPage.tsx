@@ -61,6 +61,7 @@ export function SettingsPage() {
   const [enableInterview, setEnableInterview] = useState(false);
   const [enableClustering, setEnableClustering] = useState(false);
   const [enableTemplates, setEnableTemplates] = useState(false);
+  const [enableBroadcasts, setEnableBroadcasts] = useState(false);
   const [enableParticipantRAG, setEnableParticipantRAG] = useState(false);
   const [enableCSVImport, setEnableCSVImport] = useState(false);
   const [consentRequired, setConsentRequired] = useState(false);
@@ -82,6 +83,7 @@ export function SettingsPage() {
       setEnableInterview(botSettings.config?.enableInterview ?? false);
       setEnableClustering(botSettings.config?.enableClustering ?? false);
       setEnableTemplates(botSettings.config?.enableTemplates ?? false);
+      setEnableBroadcasts(botSettings.config?.enableBroadcasts ?? false);
       setEnableParticipantRAG(botSettings.config?.enableParticipantRAG ?? false);
       setEnableCSVImport(botSettings.config?.enableCSVImport ?? false);
       setConsentRequired(botSettings.config?.consentRequired ?? false);
@@ -112,12 +114,16 @@ export function SettingsPage() {
           enableRAG,
           ragNamespace: ragNamespace || undefined,
           guardrailsPrompt: guardrails || undefined,
-          enableInterview: enableInterview || undefined,
-          enableClustering: enableClustering || undefined,
-          enableTemplates: enableTemplates || undefined,
-          enableParticipantRAG: enableParticipantRAG || undefined,
-          enableCSVImport: enableCSVImport || undefined,
-          consentRequired: consentRequired || undefined,
+          // Written as plain booleans: `flag || undefined` omitted the key when
+          // turning a flag off, so "off" only worked because patch replaces the
+          // whole config object and the reader defaults a missing key to false.
+          enableInterview,
+          enableClustering,
+          enableTemplates,
+          enableBroadcasts,
+          enableParticipantRAG,
+          enableCSVImport,
+          consentRequired,
         },
       });
 
@@ -381,9 +387,15 @@ export function SettingsPage() {
               />
               <FeatureToggle
                 label="Templates HSM"
-                description="Templates de mensagens do WhatsApp Business"
+                description="Sincronizar e configurar templates do WhatsApp Business"
                 enabled={enableTemplates}
                 onChange={setEnableTemplates}
+              />
+              <FeatureToggle
+                label="Disparo em massa"
+                description="Enviar templates aprovados para listas de participantes"
+                enabled={enableBroadcasts}
+                onChange={setEnableBroadcasts}
               />
               <FeatureToggle
                 label="Busca Semântica de Participantes"
