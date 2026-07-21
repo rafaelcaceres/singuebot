@@ -22,7 +22,7 @@ import {
   Download,
   Users
 } from 'lucide-react';
-import { toast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
 interface CSVRow {
   nome: string;
@@ -299,10 +299,8 @@ export const ImportParticipantsModal: React.FC<ImportParticipantsModalProps> = (
 
   const handleFileUpload = useCallback((file: File) => {
     if (file.type !== 'text/csv' && !file.name.endsWith('.csv')) {
-      toast({
-        title: 'Formato inválido',
+      toast.error('Formato inválido', {
         description: 'Por favor, selecione um arquivo CSV.',
-        variant: 'destructive',
       });
       return;
     }
@@ -314,10 +312,8 @@ export const ImportParticipantsModal: React.FC<ImportParticipantsModalProps> = (
         const parsedData = parseCSV(csvText);
 
         if (parsedData.length === 0) {
-          toast({
-            title: 'Arquivo vazio',
+          toast.error('Arquivo vazio', {
             description: 'O arquivo CSV não contém dados válidos.',
-            variant: 'destructive',
           });
           return;
         }
@@ -326,15 +322,12 @@ export const ImportParticipantsModal: React.FC<ImportParticipantsModalProps> = (
         setFileName(file.name); // Store the filename
         setImportResult(null);
 
-        toast({
-          title: 'Arquivo carregado',
+        toast.success('Arquivo carregado', {
           description: `${parsedData.length} participantes encontrados no arquivo.`,
         });
       } catch (error) {
-        toast({
-          title: 'Erro ao processar arquivo',
+        toast.error('Erro ao processar arquivo', {
           description: 'Não foi possível processar o arquivo CSV.',
-          variant: 'destructive',
         });
       }
     };
@@ -377,8 +370,7 @@ export const ImportParticipantsModal: React.FC<ImportParticipantsModalProps> = (
       setImportResult(result);
       
       if (result.success > 0) {
-        toast({
-          title: 'Importação concluída',
+        toast.success('Importação concluída', {
           description: `${result.success} participantes importados com sucesso.`,
         });
         
@@ -388,11 +380,7 @@ export const ImportParticipantsModal: React.FC<ImportParticipantsModalProps> = (
         }
       }
     } catch (error) {
-      toast({
-        title: 'Erro na importação',
-        description: error instanceof Error ? error.message : 'Erro desconhecido',
-        variant: 'destructive',
-      });
+      toast.error('Erro na importação');
     } finally {
       setIsProcessing(false);
     }
@@ -462,19 +450,19 @@ export const ImportParticipantsModal: React.FC<ImportParticipantsModalProps> = (
           {csvData.length === 0 && (
             <div
               className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-                dragActive 
-                  ? 'border-blue-500 bg-blue-50' 
-                  : 'border-gray-300 hover:border-gray-400'
+                dragActive
+                  ? 'border-primary bg-info-muted'
+                  : 'border-border hover:border-muted-foreground'
               }`}
               onDrop={handleDrop}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
             >
-              <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-              <p className="text-lg font-medium text-gray-900 mb-2">
+              <Upload className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+              <p className="text-lg font-medium text-foreground mb-2">
                 Arraste um arquivo CSV aqui
               </p>
-              <p className="text-sm text-gray-500 mb-4">
+              <p className="text-sm text-muted-foreground mb-4">
                 ou clique para selecionar um arquivo
               </p>
               <input
@@ -487,12 +475,9 @@ export const ImportParticipantsModal: React.FC<ImportParticipantsModalProps> = (
                 className="hidden"
                 id="csv-upload"
               />
-              <label
-                htmlFor="csv-upload"
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 cursor-pointer"
-              >
-                Selecionar Arquivo
-              </label>
+              <Button asChild className="cursor-pointer">
+                <label htmlFor="csv-upload">Selecionar Arquivo</label>
+              </Button>
             </div>
           )}
 
@@ -502,13 +487,13 @@ export const ImportParticipantsModal: React.FC<ImportParticipantsModalProps> = (
               <div className="flex items-center justify-between">
                 <div className="flex flex-col gap-1">
                   <div className="flex items-center gap-2">
-                    <FileText className="h-5 w-5 text-green-600" />
+                    <FileText className="h-5 w-5 text-success" />
                     <span className="font-medium">
                       {csvData.length} participantes encontrados
                     </span>
                   </div>
                   {fileName && (
-                    <span className="text-xs text-gray-500 ml-7">
+                    <span className="text-xs text-muted-foreground ml-7">
                       Arquivo: {fileName}
                     </span>
                   )}
@@ -529,13 +514,14 @@ export const ImportParticipantsModal: React.FC<ImportParticipantsModalProps> = (
               {/* Cluster Selection */}
               {clusters && clusters.length > 0 && (
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">
+                  <label htmlFor="cluster-select" className="text-sm font-medium text-foreground">
                     Cluster (opcional)
                   </label>
                   <select
+                    id="cluster-select"
                     value={selectedCluster || ''}
                     onChange={(e) => setSelectedCluster(e.target.value as Id<"clusters"> || undefined)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-input bg-background text-foreground rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <option value="">Nenhum cluster</option>
                     {clusters.map((cluster) => (
@@ -549,15 +535,15 @@ export const ImportParticipantsModal: React.FC<ImportParticipantsModalProps> = (
 
               {/* Sample Data Preview */}
               <div className="border rounded-lg overflow-hidden">
-                <div className="bg-gray-50 px-4 py-2 border-b flex justify-between items-center">
+                <div className="bg-muted px-4 py-2 border-b border-border flex justify-between items-center">
                   <h4 className="font-medium text-sm">Prévia dos dados (primeiras 3 linhas)</h4>
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs text-muted-foreground">
                     {csvData.length} {csvData.length === 1 ? 'participante' : 'participantes'}
                   </span>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="min-w-full text-sm">
-                    <thead className="bg-gray-50">
+                    <thead className="bg-muted">
                       <tr>
                         <th className="px-3 py-2 text-left text-xs font-medium">Nome</th>
                         <th className="px-3 py-2 text-left text-xs font-medium">Telefone</th>
@@ -573,7 +559,7 @@ export const ImportParticipantsModal: React.FC<ImportParticipantsModalProps> = (
                     </thead>
                     <tbody>
                       {csvData.slice(0, 3).map((row, index) => (
-                        <tr key={index} className="border-t hover:bg-gray-50">
+                        <tr key={index} className="border-t border-border hover:bg-muted">
                           <td className="px-3 py-2 font-medium">{row.nome}</td>
                           <td className="px-3 py-2 text-xs">{row.telefone}</td>
                           <td className="px-3 py-2 text-xs">{row.email || '-'}</td>
@@ -597,14 +583,14 @@ export const ImportParticipantsModal: React.FC<ImportParticipantsModalProps> = (
                           </td>
                           <td className="px-3 py-2 text-xs">{row.setor || '-'}</td>
                           <td className="px-3 py-2 text-xs">{row.estado || '-'}</td>
-                          <td className="px-3 py-2 text-xs text-gray-500">{row.externalId || '-'}</td>
+                          <td className="px-3 py-2 text-xs text-muted-foreground">{row.externalId || '-'}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-                <div className="bg-gray-50 px-4 py-2 border-t">
-                  <p className="text-xs text-gray-600">
+                <div className="bg-muted px-4 py-2 border-t border-border">
+                  <p className="text-xs text-muted-foreground">
                     <span className="font-medium">Nota:</span> "Empresa (Texto)" = campo livre, "Empresa (Dropdown)" = seleção do programa
                   </p>
                 </div>
@@ -616,10 +602,10 @@ export const ImportParticipantsModal: React.FC<ImportParticipantsModalProps> = (
           {isProcessing && (
             <div className="space-y-4">
               <div className="flex items-center gap-2">
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary" aria-hidden="true"></div>
                 <span>Importando participantes...</span>
               </div>
-              <Progress value={50} className="w-full" />
+              <Progress value={50} className="w-full" aria-label="Importando participantes" />
             </div>
           )}
 
@@ -627,48 +613,42 @@ export const ImportParticipantsModal: React.FC<ImportParticipantsModalProps> = (
           {importResult && (
             <div className="space-y-4">
               <div className="grid grid-cols-3 gap-4">
-                <div className="text-center p-4 bg-green-50 rounded-lg">
-                  <CheckCircle className="h-8 w-8 text-green-600 mx-auto mb-2" />
-                  <div className="text-2xl font-bold text-green-600">
-                    {importResult.success}
-                  </div>
-                  <div className="text-sm text-green-700">Importados</div>
+                <div className="text-center p-4 bg-success-muted text-success-muted-foreground rounded-lg">
+                  <CheckCircle className="h-8 w-8 mx-auto mb-2" aria-hidden="true" />
+                  <div className="text-2xl font-bold">{importResult.success}</div>
+                  <div className="text-sm">Importados</div>
                 </div>
-                
-                <div className="text-center p-4 bg-yellow-50 rounded-lg">
-                  <AlertCircle className="h-8 w-8 text-yellow-600 mx-auto mb-2" />
-                  <div className="text-2xl font-bold text-yellow-600">
-                    {importResult.duplicates.length}
-                  </div>
-                  <div className="text-sm text-yellow-700">Duplicados</div>
+
+                <div className="text-center p-4 bg-warning-muted text-warning-muted-foreground rounded-lg">
+                  <AlertCircle className="h-8 w-8 mx-auto mb-2" aria-hidden="true" />
+                  <div className="text-2xl font-bold">{importResult.duplicates.length}</div>
+                  <div className="text-sm">Duplicados</div>
                 </div>
-                
-                <div className="text-center p-4 bg-red-50 rounded-lg">
-                  <X className="h-8 w-8 text-red-600 mx-auto mb-2" />
-                  <div className="text-2xl font-bold text-red-600">
-                    {importResult.errors.length}
-                  </div>
-                  <div className="text-sm text-red-700">Erros</div>
+
+                <div className="text-center p-4 bg-destructive-muted text-destructive-muted-foreground rounded-lg">
+                  <X className="h-8 w-8 mx-auto mb-2" aria-hidden="true" />
+                  <div className="text-2xl font-bold">{importResult.errors.length}</div>
+                  <div className="text-sm">Erros</div>
                 </div>
               </div>
 
               {(importResult.errors.length > 0 || importResult.duplicates.length > 0) && (
                 <div className="space-y-4">
-                  <div className="p-4 border border-yellow-200 bg-yellow-50 rounded-lg">
+                  <div className="p-4 border border-border bg-warning-muted text-warning-muted-foreground rounded-lg">
                     <div className="flex items-start">
-                      <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5 mr-3" />
+                      <AlertCircle className="h-5 w-5 mt-0.5 mr-3" aria-hidden="true" />
                       <div className="flex-1">
                         {importResult.errors.length > 0 && (
                           <div>
-                            <strong className="text-yellow-800">{importResult.errors.length} erros encontrados:</strong>
+                            <strong>{importResult.errors.length} erros encontrados:</strong>
                             <ul className="mt-2 space-y-1">
                               {importResult.errors.slice(0, 3).map((error, index) => (
-                                <li key={index} className="text-sm text-yellow-700">
+                                <li key={index} className="text-sm">
                                   Linha {error.row}: {error.error}
                                 </li>
                               ))}
                               {importResult.errors.length > 3 && (
-                                <li className="text-sm text-yellow-600">
+                                <li className="text-sm">
                                   ... e mais {importResult.errors.length - 3} erros
                                 </li>
                               )}
@@ -678,7 +658,7 @@ export const ImportParticipantsModal: React.FC<ImportParticipantsModalProps> = (
                         
                         {importResult.duplicates.length > 0 && (
                           <div className="mt-4">
-                            <strong className="text-yellow-800">{importResult.duplicates.length} participantes já existem</strong>
+                            <strong>{importResult.duplicates.length} participantes já existem</strong>
                           </div>
                         )}
                       </div>
@@ -712,7 +692,7 @@ export const ImportParticipantsModal: React.FC<ImportParticipantsModalProps> = (
             >
               {isProcessing ? (
                 <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2" aria-hidden="true"></div>
                   Importando...
                 </>
               ) : (

@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useQuery } from 'convex/react';
+import { useSearchParams } from 'react-router-dom';
+import { MessagesSquare } from 'lucide-react';
 import { api } from '../../../convex/_generated/api';
 import { Id } from '../../../convex/_generated/dataModel';
 import { MetricsBar } from '../components/operator/MetricsBar';
@@ -8,48 +10,95 @@ import { ConversationPanel } from '../components/operator/ConversationPanel';
 
 type FilterType = 'all' | 'active' | 'needs_attention' | 'unread';
 
+/**
+ * The console's single inbox.
+ *
+ * The open conversation lives in the URL (`?participant=<id>`) rather than in
+ * component state: the conversations table, the participants table and the
+ * dashboard all link straight to a thread here, which is what let us delete the
+ * second, parallel conversation viewer.
+ */
+const FILTERS: FilterType[] = ['all', 'active', 'needs_attention', 'unread'];
+
+function parseFilter(value: string | null): FilterType {
+  return FILTERS.includes(value as FilterType) ? (value as FilterType) : 'all';
+}
+
 export const OperatorDashboard: React.FC = () => {
-  const [selectedParticipantId, setSelectedParticipantId] = useState<Id<'participants'> | null>(null);
-  const [filter, setFilter] = useState<FilterType>('all');
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Fetch metrics
+  const selectedParticipantId = (searchParams.get('participant') ||
+    null) as Id<'participants'> | null;
+  // Also in the URL, so the dashboard can link straight to "needs attention".
+  const filter = parseFilter(searchParams.get('filter'));
+
+  const setFilter = useCallback(
+    (next: FilterType) => {
+      setSearchParams(
+        (previous) => {
+          const params = new URLSearchParams(previous);
+          if (next === 'all') {
+            params.delete('filter');
+          } else {
+            params.set('filter', next);
+          }
+          return params;
+        },
+        { replace: true }
+      );
+    },
+    [setSearchParams]
+  );
+
+  const selectConversation = useCallback(
+    (participantId: Id<'participants'> | null) => {
+      setSearchParams(
+        (previous) => {
+          const next = new URLSearchParams(previous);
+          if (participantId) {
+            next.set('participant', participantId);
+          } else {
+            next.delete('participant');
+          }
+          return next;
+        },
+        { replace: true }
+      );
+    },
+    [setSearchParams]
+  );
+
   const metrics = useQuery(api.operatorDashboard.getOperatorMetrics);
 
-  // Fetch conversations
   const conversations = useQuery(api.operatorDashboard.getOperatorConversations, {
     filter,
     search: searchQuery || undefined,
     limit: 100,
   });
 
-  // Fetch selected conversation details
   const conversationDetail = useQuery(
     api.operatorDashboard.getConversationDetail,
     selectedParticipantId ? { participantId: selectedParticipantId } : 'skip'
   );
 
-  // Use negative margins to break out of AdminLayout's container padding
-  // Height: 100vh - header (64px) - container padding (32px top + 32px bottom)
+  // AdminLayout renders this route full-bleed, so the height comes from the
+  // shell instead of a calc() that had to guess the header and padding sizes.
   return (
-    <div className="h-[calc(100vh-64px-64px)] flex flex-col bg-gray-50 -mx-6 -my-8">
-      {/* Header */}
-      <div className="shrink-0 bg-white border-b border-gray-200 px-6 py-3">
-        <h1 className="text-xl font-bold text-gray-900">Central de Atendimento</h1>
+    <div className="h-full flex flex-col bg-background">
+      <div className="shrink-0 bg-card border-b border-border px-6 py-3">
+        <h1 className="text-lg font-semibold text-foreground">Central de Atendimento</h1>
       </div>
 
-      {/* Metrics Bar */}
       <div className="shrink-0">
         <MetricsBar metrics={metrics} />
       </div>
 
-      {/* Main Content */}
       <div className="flex-1 flex min-h-0">
-        {/* Sidebar */}
         <ConversationSidebar
           conversations={conversations || []}
           selectedParticipantId={selectedParticipantId}
-          onSelectConversation={setSelectedParticipantId}
+          onSelectConversation={selectConversation}
           filter={filter}
           onFilterChange={setFilter}
           searchQuery={searchQuery}
@@ -57,7 +106,6 @@ export const OperatorDashboard: React.FC = () => {
           isLoading={conversations === undefined}
         />
 
-        {/* Main Panel */}
         <div className="flex-1 flex flex-col min-h-0">
           {selectedParticipantId && conversationDetail ? (
             <ConversationPanel
@@ -65,18 +113,23 @@ export const OperatorDashboard: React.FC = () => {
               participantId={selectedParticipantId}
             />
           ) : (
-            <div className="flex-1 flex items-center justify-center bg-gray-100">
-              <div className="text-center">
-                <div className="w-16 h-16 mx-auto mb-4 bg-gray-200 rounded-full flex items-center justify-center">
-                  <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                  </svg>
+            <div className="flex-1 flex items-center justify-center bg-muted/40 p-6">
+              <div className="text-center max-w-sm">
+                <div
+                  aria-hidden="true"
+                  className="w-14 h-14 mx-auto mb-4 bg-muted rounded-full flex items-center justify-center"
+                >
+                  <MessagesSquare className="w-7 h-7 text-muted-foreground" />
                 </div>
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  Selecione uma conversa
-                </h3>
-                <p className="text-gray-500">
-                  Escolha uma conversa na lista ao lado para visualizar as mensagens
+                <h2 className="text-base font-medium text-foreground mb-1">
+                  {selectedParticipantId
+                    ? 'Carregando conversa...'
+                    : 'Selecione uma conversa'}
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  {selectedParticipantId
+                    ? 'Se ela não aparecer, o participante pode ter sido removido.'
+                    : 'Escolha uma conversa na lista ao lado para ver as mensagens e responder.'}
                 </p>
               </div>
             </div>

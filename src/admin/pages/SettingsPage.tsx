@@ -9,7 +9,8 @@ import { Label } from "../../components/ui/label";
 import { Textarea } from "../../components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { Badge } from "../../components/ui/badge";
-import { useToast } from "@/hooks/use-toast";
+import { PageHeader } from "../components/PageHeader";
+import { toast } from "sonner";
 import { Settings, Bot, Shield, Sliders, Save, ToggleLeft, ToggleRight } from "lucide-react";
 
 function FeatureToggle({
@@ -23,26 +24,31 @@ function FeatureToggle({
   enabled: boolean;
   onChange: (value: boolean) => void;
 }) {
+  // A real switch: was a <div onClick>, unreachable by keyboard and silent to
+  // screen readers. role="switch" + aria-checked + button semantics give Space,
+  // Enter, focus and announcement for free.
   return (
-    <div
-      className="flex items-center justify-between p-4 border rounded-lg cursor-pointer hover:bg-accent/50 transition-colors"
+    <button
+      type="button"
+      role="switch"
+      aria-checked={enabled}
       onClick={() => onChange(!enabled)}
+      className="w-full flex items-center justify-between gap-4 p-4 border border-border rounded-lg text-left hover:bg-accent/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
-      <div>
-        <p className="font-medium text-sm">{label}</p>
-        <p className="text-xs text-muted-foreground">{description}</p>
-      </div>
+      <span className="min-w-0">
+        <span className="block font-medium text-sm">{label}</span>
+        <span className="block text-xs text-muted-foreground">{description}</span>
+      </span>
       {enabled ? (
-        <ToggleRight className="h-6 w-6 text-primary" />
+        <ToggleRight className="h-6 w-6 shrink-0 text-primary" aria-hidden="true" />
       ) : (
-        <ToggleLeft className="h-6 w-6 text-muted-foreground" />
+        <ToggleLeft className="h-6 w-6 shrink-0 text-muted-foreground" aria-hidden="true" />
       )}
-    </div>
+    </button>
   );
 }
 
 export function SettingsPage() {
-  const { toast } = useToast();
   const botSettings = useQuery(api.functions.botConfig.getActiveBotSettings);
   const updateBotConfig = useMutation(api.functions.botConfig.updateBotConfig);
 
@@ -92,10 +98,8 @@ export function SettingsPage() {
 
   const handleSave = async () => {
     if (!botSettings?._id) {
-      toast({
-        title: "Erro",
+      toast.error("Erro", {
         description: "Nenhum bot configurado. Execute o seed primeiro.",
-        variant: "destructive",
       });
       return;
     }
@@ -127,16 +131,13 @@ export function SettingsPage() {
         },
       });
 
-      toast({
-        title: "Configurações salvas",
+      toast.success("Configurações salvas", {
         description: "As configurações do bot foram atualizadas.",
       });
     } catch (error) {
       console.error("Error saving settings:", error);
-      toast({
-        title: "Erro ao salvar",
+      toast.error("Erro ao salvar", {
         description: "Não foi possível salvar as configurações.",
-        variant: "destructive",
       });
     } finally {
       setIsSaving(false);
@@ -157,23 +158,21 @@ export function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Configurações</h1>
-          <p className="text-muted-foreground">
-            Configure o bot, personalidade e funcionalidades
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {botSettings.tenantName && (
-            <Badge variant="outline">{botSettings.tenantName}</Badge>
-          )}
-          <Button onClick={() => void handleSave()} disabled={isSaving}>
-            <Save className="h-4 w-4 mr-2" />
-            {isSaving ? "Salvando..." : "Salvar"}
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Configurações"
+        description="Configure o bot, personalidade e funcionalidades"
+        actions={
+          <>
+            {botSettings.tenantName && (
+              <Badge variant="outline">{botSettings.tenantName}</Badge>
+            )}
+            <Button onClick={() => void handleSave()} disabled={isSaving}>
+              <Save className="h-4 w-4 mr-2" />
+              {isSaving ? "Salvando..." : "Salvar"}
+            </Button>
+          </>
+        }
+      />
 
       <Tabs defaultValue="personality">
         <TabsList>
@@ -308,7 +307,7 @@ export function SettingsPage() {
                   step="0.1"
                   value={temperature}
                   onChange={(e) => setTemperature(parseFloat(e.target.value))}
-                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                  className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer focus-visible:ring-2 focus-visible:ring-ring"
                 />
                 <div className="flex justify-between text-xs text-muted-foreground">
                   <span>Preciso (0)</span>

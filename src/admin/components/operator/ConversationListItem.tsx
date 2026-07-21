@@ -1,5 +1,6 @@
 import React from 'react';
 import { Id } from '../../../../convex/_generated/dataModel';
+import { StatusBadge } from '@/components/ui/status-badge';
 
 interface Conversation {
   participantId: Id<'participants'>;
@@ -31,11 +32,18 @@ export const ConversationListItem: React.FC<ConversationListItemProps> = ({
 }) => {
   const { contact, lastMessage, unreadCount, status, operatorMode } = conversation;
 
-  const statusColors = {
-    active: 'bg-green-500',
-    fallback: 'bg-yellow-500',
-    needs_attention: 'bg-red-500 animate-pulse',
-    inactive: 'bg-gray-400',
+  const statusDot: Record<Conversation['status'], string> = {
+    active: 'bg-success',
+    fallback: 'bg-warning',
+    needs_attention: 'bg-destructive animate-pulse',
+    inactive: 'bg-muted-foreground',
+  };
+
+  const statusLabel: Record<Conversation['status'], string> = {
+    active: 'Ativa',
+    fallback: 'Em fallback',
+    needs_attention: 'Precisa de atenção',
+    inactive: 'Inativa',
   };
 
   const formatTimeAgo = (timestamp: number): string => {
@@ -78,47 +86,46 @@ export const ConversationListItem: React.FC<ConversationListItemProps> = ({
   return (
     <button
       onClick={onClick}
-      className={`w-full text-left p-3 hover:bg-gray-50 transition-colors ${
-        isSelected ? 'bg-blue-50 border-l-4 border-l-blue-600' : ''
+      aria-current={isSelected ? 'true' : undefined}
+      className={`w-full text-left p-3 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset ${
+        isSelected ? 'bg-primary/10' : ''
       }`}
     >
       <div className="flex items-start gap-3">
         {/* Avatar with status indicator */}
         <div className="relative flex-shrink-0">
-          <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-medium">
+          <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-medium">
             {getInitial()}
           </div>
           <div
-            className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white ${statusColors[status]}`}
+            aria-hidden="true"
+            className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-card ${statusDot[status]}`}
           />
+          <span className="sr-only">Status: {statusLabel[status]}</span>
         </div>
 
         {/* Content */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
-              <span className="font-medium text-gray-900 truncate">
+              <span className="font-medium text-foreground truncate">
                 {contact.name || 'Sem nome'}
               </span>
-              {operatorMode && (
-                <span className="px-1.5 py-0.5 text-xs bg-purple-100 text-purple-700 rounded">
-                  Operador
-                </span>
-              )}
+              {operatorMode && <StatusBadge tone="info">Operador</StatusBadge>}
             </div>
             {lastMessage && (
-              <span className="text-xs text-gray-500 flex-shrink-0">
+              <span className="text-xs text-muted-foreground flex-shrink-0">
                 {formatTimeAgo(lastMessage.timestamp)}
               </span>
             )}
           </div>
 
-          <p className="text-sm text-gray-500 truncate">{formatPhone(contact.phone)}</p>
+          <p className="text-sm text-muted-foreground truncate">{formatPhone(contact.phone)}</p>
 
           {lastMessage && (
-            <p className="text-sm text-gray-600 truncate mt-1">
+            <p className="text-sm text-muted-foreground truncate mt-1">
               {lastMessage.direction === 'outbound' && (
-                <span className="text-gray-400 mr-1">Você:</span>
+                <span className="text-muted-foreground mr-1">Você:</span>
               )}
               {lastMessage.text}
             </p>
@@ -128,8 +135,9 @@ export const ConversationListItem: React.FC<ConversationListItemProps> = ({
         {/* Unread badge */}
         {unreadCount > 0 && (
           <div className="flex-shrink-0">
-            <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-bold text-white bg-red-500 rounded-full">
+            <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-bold text-destructive-foreground bg-destructive rounded-full">
               {unreadCount > 99 ? '99+' : unreadCount}
+              <span className="sr-only"> mensagens não lidas</span>
             </span>
           </div>
         )}

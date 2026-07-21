@@ -1,6 +1,10 @@
 import { v } from "convex/values";
 import { query, mutation, action } from "./_generated/server";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
+import { postTemplateMessage, statusCallbackUrl } from "./lib/twilioClient";
+
+/** WhatsApp's free-form service window. Outside it, only approved HSM templates send. */
+export const WINDOW_MS = 24 * 60 * 60 * 1000;
 
 // ============ QUERIES ============
 
@@ -281,6 +285,20 @@ export const getConversationDetail = query({
       .withIndex("by_participant", (q) => q.eq("participantId", args.participantId))
       .collect();
 
+    // The WhatsApp 24-hour service window. Meta measures it from the last
+    // message the participant sent us; we approximate that with the webhook's
+    // receipt time, which can drift by seconds. Treat `isOpen` as advisory —
+    // Twilio error 63016 is the authority — but never leave it invisible: an
+    // operator typing into a closed window is a message that silently fails.
+    let lastInboundAt: number | null = null;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].direction === "inbound") {
+        lastInboundAt = messages[i]._creationTime;
+        break;
+      }
+    }
+    const expiresAt = lastInboundAt === null ? null : lastInboundAt + WINDOW_MS;
+
     return {
       participant: {
         ...participant,
@@ -312,6 +330,11 @@ export const getConversationDetail = query({
         operatorTookOverAt: context?.operatorTookOverAt,
       },
       profile,
+      window: {
+        lastInboundAt,
+        expiresAt,
+        isOpen: expiresAt !== null && Date.now() < expiresAt,
+      },
       stats: {
         totalConversations: allConversations.length,
         totalMessages: messages.length,
@@ -565,7 +588,13 @@ export const markConversationAsRead = mutation({
 // ============ ACTIONS ============
 
 /**
- * Send message as operator (via Twilio)
+ * Send a message as the human operator. This is the ONLY manual send path —
+ * `admin.sendManualMessage` was an identical twin reachable from the old
+ * conversation viewer, and it let a human type while the AI was still
+ * answering, producing two replies to one question.
+ *
+ * Taking over is now part of sending: you cannot speak for the assistant
+ * without also pausing it.
  */
 export const sendOperatorMessage = action({
   args: {
@@ -573,7 +602,6 @@ export const sendOperatorMessage = action({
     message: v.string(),
   },
   handler: async (ctx, args) => {
-    // Get participant phone
     const participant = await ctx.runQuery(api.admin.getParticipantById, {
       participantId: args.participantId,
     });
@@ -582,12 +610,81 @@ export const sendOperatorMessage = action({
       throw new Error("Participant not found");
     }
 
-    // Send via Twilio using existing action
+    await ctx.runMutation(api.operatorDashboard.takeOverConversation, {
+      participantId: args.participantId,
+    });
+
     await ctx.runAction(api.whatsapp.sendMessage, {
       to: participant.phone,
       body: args.message,
     });
 
     return { success: true };
+  },
+});
+
+/**
+ * Send an approved HSM template from the inbox.
+ *
+ * This is the only way to reach a participant once the 24-hour window has
+ * closed. Taking over first, same as a free-form send: the operator is speaking,
+ * so the assistant stops.
+ */
+export const sendOperatorTemplate = action({
+  args: {
+    participantId: v.id("participants"),
+    templateId: v.id("templates"),
+    overrides: v.optional(v.record(v.string(), v.string())),
+  },
+  returns: v.object({
+    success: v.boolean(),
+    renderedBody: v.optional(v.string()),
+  }),
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ success: boolean; renderedBody?: string }> => {
+    const resolved: {
+      templateName: string;
+      contentSid: string;
+      contentVariables: Record<string, string>;
+      missingRequired: string[];
+      renderedBody?: string;
+      phone: string;
+    } = await ctx.runQuery(
+      internal.functions.broadcasts.resolveTemplateForParticipant,
+      {
+        templateId: args.templateId,
+        participantId: args.participantId,
+        overrides: args.overrides,
+      },
+    );
+
+    if (resolved.missingRequired.length > 0) {
+      throw new Error(
+        `Faltam variáveis obrigatórias para este participante: ${resolved.missingRequired.join(", ")}. Preencha o cadastro ou configure um valor padrão no template.`,
+      );
+    }
+
+    await ctx.runMutation(api.operatorDashboard.takeOverConversation, {
+      participantId: args.participantId,
+    });
+
+    const response = await postTemplateMessage({
+      to: resolved.phone,
+      contentSid: resolved.contentSid,
+      contentVariables: resolved.contentVariables,
+      statusCallback: statusCallbackUrl(),
+    });
+
+    await ctx.runMutation(internal.functions.broadcasts.logBroadcastMessage, {
+      participantId: args.participantId,
+      messageId: response.sid,
+      phone: resolved.phone,
+      templateName: resolved.templateName,
+      twilioData: response,
+    });
+
+    return { success: true, renderedBody: resolved.renderedBody };
   },
 });

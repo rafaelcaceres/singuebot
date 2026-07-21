@@ -234,6 +234,63 @@ const createBroadcastArgs = {
  * Public entry point: policy only (who may send, and is the feature on).
  * The mechanism lives in createBroadcastInternal.
  */
+/**
+ * Resolve one approved template against one participant, for the operator inbox.
+ *
+ * Outside the WhatsApp 24-hour window a free-form reply silently fails, so the
+ * composer falls back to sending a template. Same resolution rules as a
+ * broadcast — one recipient instead of thousands.
+ */
+export const resolveTemplateForParticipant = internalQuery({
+  args: {
+    templateId: v.id("templates"),
+    participantId: v.id("participants"),
+    overrides: v.optional(v.record(v.string(), v.string())),
+  },
+  // Explicit, because the operator inbox calls this across a module cycle and
+  // TypeScript cannot infer the shape through it.
+  returns: v.object({
+    templateName: v.string(),
+    contentSid: v.string(),
+    contentVariables: v.record(v.string(), v.string()),
+    missingRequired: v.array(v.string()),
+    renderedBody: v.optional(v.string()),
+    phone: v.string(),
+  }),
+  handler: async (ctx, args) => {
+    const template = await ctx.db.get(args.templateId);
+    if (!template) throw new Error("Template não encontrado");
+    if (template.approvalStatus !== "approved") {
+      throw new Error(
+        `Template "${template.name}" não está aprovado no Twilio e não pode ser enviado.`,
+      );
+    }
+    if (!template.twilioId) {
+      throw new Error(`Template "${template.name}" não tem ContentSid.`);
+    }
+
+    const participant = await ctx.db.get(args.participantId);
+    if (!participant) throw new Error("Participante não encontrado");
+
+    const mappings = buildMappings(template, defaultMappingInputs(template));
+    const { contentVariables, missingRequired } = resolveContentVariables(
+      mappings,
+      participant as unknown as Record<string, unknown>,
+      args.overrides,
+      formatParticipantFieldValue,
+    );
+
+    return {
+      templateName: template.name,
+      contentSid: template.twilioId,
+      contentVariables,
+      missingRequired,
+      renderedBody: renderTemplateBody(template.twilioStructure?.body, contentVariables),
+      phone: participant.phone,
+    };
+  },
+});
+
 export const createBroadcast = mutation({
   args: createBroadcastArgs,
   returns: v.id("broadcasts"),

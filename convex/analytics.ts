@@ -259,8 +259,22 @@ export const getSystemHealth = query({
     const aiProcessingHealth = recentAIInteractions.length > 0 ? "healthy" : "idle";
     const knowledgeProcessingHealth = processingJobs.length === 0 ? "healthy" : "processing";
 
+    // Derived, not asserted. This used to return a hardcoded "healthy" plus a
+    // fabricated "99.9%" uptime — a dashboard that reports confidence it has not
+    // measured is worse than one that reports nothing.
+    const subsystemStatuses = [
+      messageProcessingHealth,
+      aiProcessingHealth,
+      knowledgeProcessingHealth,
+    ];
+    const overall = subsystemStatuses.every((s) => s === "healthy")
+      ? "healthy"
+      : subsystemStatuses.includes("processing")
+        ? "processing"
+        : "idle";
+
     return {
-      overall: "healthy", // Would be calculated based on all subsystems
+      overall,
       subsystems: {
         messageProcessing: {
           status: messageProcessingHealth,
@@ -278,7 +292,6 @@ export const getSystemHealth = query({
           lastProcessed: null, // Would track last successful processing
         },
       },
-      uptime: "99.9%", // Placeholder - would be calculated from actual monitoring
       lastUpdated: now,
     };
   },

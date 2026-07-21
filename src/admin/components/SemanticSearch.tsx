@@ -100,15 +100,18 @@ export function SemanticSearch({
             Exemplos de buscas:
           </p>
           <div className="flex flex-wrap gap-2">
+            {/* Real buttons: these fill the search box on click, so they must be
+                keyboard-operable. A Badge renders a <div> — the same trap the
+                Settings toggle just shed. */}
             {EXAMPLE_QUERIES.map((example, index) => (
-              <Badge
+              <button
                 key={index}
-                variant="outline"
-                className="cursor-pointer hover:bg-primary/10 hover:border-primary transition-colors"
+                type="button"
                 onClick={() => handleExampleClick(example)}
+                className="inline-flex items-center rounded-md border border-border px-2.5 py-0.5 text-xs text-muted-foreground hover:bg-primary/10 hover:border-primary hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 {example}
-              </Badge>
+              </button>
             ))}
           </div>
         </div>

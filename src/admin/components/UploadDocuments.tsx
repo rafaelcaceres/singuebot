@@ -5,7 +5,7 @@ import { api } from '../../../convex/_generated/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Progress } from '../../components/ui/progress';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from "sonner";
 import { Upload, FileText, X, CheckCircle, AlertCircle } from 'lucide-react';
 
 interface UploadFile {
@@ -23,7 +23,6 @@ interface UploadDocumentsProps {
 const UploadDocuments: React.FC<UploadDocumentsProps> = ({ namespace }) => {
   const [uploadFiles, setUploadFiles] = useState<UploadFile[]>([]);
   const uploadDocument = useMutation(api.admin.uploadKnowledgeDocument);
-  const { toast } = useToast();
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const newFiles: UploadFile[] = acceptedFiles.map(file => ({
@@ -99,8 +98,7 @@ const UploadDocuments: React.FC<UploadDocumentsProps> = ({ namespace }) => {
           : f
       ));
 
-      toast({
-        title: "Upload realizado com sucesso",
+      toast.success("Upload realizado com sucesso", {
         description: `${uploadFile.file.name} foi processado.`,
       });
 
@@ -113,10 +111,8 @@ const UploadDocuments: React.FC<UploadDocumentsProps> = ({ namespace }) => {
           : f
       ));
 
-      toast({
-        title: "Erro no upload",
+      toast.error("Erro no upload", {
         description: `Falha ao processar ${uploadFile.file.name}: ${errorMessage}`,
-        variant: "destructive",
       });
     }
   };
@@ -139,13 +135,19 @@ const UploadDocuments: React.FC<UploadDocumentsProps> = ({ namespace }) => {
   const getStatusIcon = (status: UploadFile['status']) => {
     switch (status) {
       case 'success':
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
+        return <CheckCircle className="h-4 w-4 text-success" aria-label="Enviado" />;
       case 'error':
-        return <AlertCircle className="h-4 w-4 text-red-500" />;
+        return <AlertCircle className="h-4 w-4 text-destructive" aria-label="Erro no envio" />;
       case 'uploading':
-        return <div className="h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />;
+        return (
+          <div
+            className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin"
+            aria-label="Enviando"
+            role="status"
+          />
+        );
       default:
-        return <FileText className="h-4 w-4 text-gray-500" />;
+        return <FileText className="h-4 w-4 text-muted-foreground" aria-label="Aguardando" />;
     }
   };
 
@@ -163,21 +165,21 @@ const UploadDocuments: React.FC<UploadDocumentsProps> = ({ namespace }) => {
           <div
             {...getRootProps()}
             className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-              isDragActive 
-                ? 'border-blue-500 bg-blue-50' 
-                : 'border-gray-300 hover:border-gray-400'
+              isDragActive
+                ? 'border-primary bg-info-muted'
+                : 'border-border hover:border-muted-foreground'
             }`}
           >
             <input {...getInputProps()} />
-            <Upload className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+            <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
             {isDragActive ? (
-              <p className="text-blue-600">Solte os arquivos aqui...</p>
+              <p className="text-primary">Solte os arquivos aqui...</p>
             ) : (
               <div>
-                <p className="text-gray-600 mb-2">
+                <p className="text-muted-foreground mb-2">
                   Arraste arquivos aqui ou clique para selecionar
                 </p>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-muted-foreground">
                   Suporte para PDF, DOC, DOCX, TXT, MD (máx. 10MB)
                 </p>
               </div>
@@ -213,32 +215,37 @@ const UploadDocuments: React.FC<UploadDocumentsProps> = ({ namespace }) => {
           <CardContent>
             <div className="space-y-3">
               {uploadFiles.map((uploadFile) => (
-                <div key={uploadFile.id} className="flex items-center gap-3 p-3 border rounded-lg">
+                <div key={uploadFile.id} className="flex items-center gap-3 p-3 border border-border rounded-lg">
                   {getStatusIcon(uploadFile.status)}
                   
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate">{uploadFile.file.name}</p>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-muted-foreground">
                       {(uploadFile.file.size / 1024 / 1024).toFixed(2)} MB
                     </p>
                     {uploadFile.error && (
-                      <p className="text-sm text-red-500 mt-1">{uploadFile.error}</p>
+                      <p className="text-sm text-destructive mt-1">{uploadFile.error}</p>
                     )}
                   </div>
 
                   {uploadFile.status === 'uploading' && (
                     <div className="w-24">
-                      <Progress value={uploadFile.progress} className="h-2" />
+                      <Progress
+                        value={uploadFile.progress}
+                        className="h-2"
+                        aria-label={`Progresso do envio de ${uploadFile.file.name}`}
+                      />
                     </div>
                   )}
 
                   <Button
                     variant="ghost"
                     size="sm"
+                    aria-label={`Remover ${uploadFile.file.name}`}
                     onClick={() => removeFile(uploadFile.id)}
                     disabled={uploadFile.status === 'uploading'}
                   >
-                    <X className="h-4 w-4" />
+                    <X className="h-4 w-4" aria-hidden="true" />
                   </Button>
                 </div>
               ))}

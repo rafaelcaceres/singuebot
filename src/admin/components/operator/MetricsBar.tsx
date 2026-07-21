@@ -15,7 +15,7 @@ export const MetricsBar: React.FC<MetricsBarProps> = ({ metrics }) => {
   const isLoading = metrics === undefined;
 
   return (
-    <div className="bg-white border-b border-gray-200 px-6 py-3">
+    <div className="bg-card border-b border-border px-6 py-3">
       <div className="flex items-center gap-6">
         {/* Active Now */}
         <MetricCard
@@ -93,19 +93,19 @@ const MetricCard: React.FC<MetricCardProps> = ({
 }) => {
   const variantStyles = {
     default: {
-      bg: 'bg-gray-100',
-      text: 'text-gray-700',
-      icon: 'text-gray-500',
+      bg: 'bg-muted',
+      text: 'text-foreground',
+      icon: 'text-muted-foreground',
     },
     warning: {
-      bg: 'bg-yellow-50',
-      text: 'text-yellow-700',
-      icon: 'text-yellow-500',
+      bg: 'bg-warning-muted',
+      text: 'text-warning-muted-foreground',
+      icon: 'text-warning-muted-foreground',
     },
     danger: {
-      bg: 'bg-red-50',
-      text: 'text-red-700',
-      icon: 'text-red-500',
+      bg: 'bg-destructive-muted',
+      text: 'text-destructive-muted-foreground',
+      icon: 'text-destructive-muted-foreground',
     },
   };
 
@@ -117,13 +117,15 @@ const MetricCard: React.FC<MetricCardProps> = ({
         pulse ? 'animate-pulse' : ''
       }`}
     >
-      <div className={styles.icon}>{icon}</div>
+      <div className={styles.icon} aria-hidden="true">
+        {icon}
+      </div>
       <div>
-        <p className="text-xs text-gray-500">{label}</p>
+        <p className="text-xs text-muted-foreground">{label}</p>
         {isLoading ? (
-          <div className="h-6 w-8 bg-gray-200 rounded animate-pulse" />
+          <div className="h-6 w-8 bg-muted rounded animate-pulse" />
         ) : (
-          <p className={`text-xl font-bold ${styles.text}`}>{value ?? 0}</p>
+          <p className={`text-xl font-semibold tabular-nums ${styles.text}`}>{value ?? 0}</p>
         )}
       </div>
     </div>

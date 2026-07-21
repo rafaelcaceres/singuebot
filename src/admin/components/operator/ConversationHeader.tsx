@@ -2,7 +2,12 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useMutation } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
 import { Id } from '../../../../convex/_generated/dataModel';
-import { Pencil, X, Check } from 'lucide-react';
+import { Pencil, X, Check, AlertTriangle, Info } from 'lucide-react';
+import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { windowBadge, type ConversationWindow } from '@/admin/lib/messageWindow';
 
 interface Participant {
   name?: string;
@@ -17,15 +22,28 @@ interface Context {
 interface ConversationHeaderProps {
   participant: Participant;
   context: Context;
+  window: ConversationWindow;
   onToggleAttention: () => void;
   onToggleDetails: () => void;
   showDetails: boolean;
   participantId: Id<'participants'>;
 }
 
+function formatPhone(phone: string): string {
+  const cleaned = phone.replace(/\D/g, '');
+  if (cleaned.length === 13) {
+    return `+${cleaned.slice(0, 2)} ${cleaned.slice(2, 4)} ${cleaned.slice(4, 9)}-${cleaned.slice(9)}`;
+  }
+  if (cleaned.length === 12) {
+    return `+${cleaned.slice(0, 2)} ${cleaned.slice(2, 4)} ${cleaned.slice(4, 8)}-${cleaned.slice(8)}`;
+  }
+  return phone;
+}
+
 export const ConversationHeader: React.FC<ConversationHeaderProps> = ({
   participant,
   context,
+  window: messageWindow,
   onToggleAttention,
   onToggleDetails,
   showDetails,
@@ -57,13 +75,14 @@ export const ConversationHeader: React.FC<ConversationHeaderProps> = ({
     setIsSavingName(true);
     try {
       await updateParticipant({
-        participantId: participantId as any,
+        participantId,
         updates: { name: editedName.trim() },
       });
       setIsEditingName(false);
     } catch (error) {
-      console.error('Failed to update name:', error);
-      alert('Erro ao salvar nome. Tente novamente.');
+      toast.error('Não foi possível salvar o nome', {
+        description: error instanceof Error ? error.message : 'Tente novamente.',
+      });
     } finally {
       setIsSavingName(false);
     }
@@ -74,134 +93,115 @@ export const ConversationHeader: React.FC<ConversationHeaderProps> = ({
     setIsEditingName(false);
   };
 
-  const formatPhone = (phone: string): string => {
-    const cleaned = phone.replace(/\D/g, '');
-    if (cleaned.length === 13) {
-      return `+${cleaned.slice(0, 2)} ${cleaned.slice(2, 4)} ${cleaned.slice(4, 9)}-${cleaned.slice(9)}`;
-    }
-    if (cleaned.length === 12) {
-      return `+${cleaned.slice(0, 2)} ${cleaned.slice(2, 4)} ${cleaned.slice(4, 8)}-${cleaned.slice(8)}`;
-    }
-    return phone;
-  };
+  const windowState = windowBadge(messageWindow);
 
   return (
-    <div className="shrink-0 px-4 py-3 border-b bg-gray-50">
-      <div className="flex items-center justify-between">
-        {/* Contact Info */}
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-medium text-sm">
+    <div className="shrink-0 px-4 py-3 border-b border-border bg-card">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-3 min-w-0">
+          <div
+            aria-hidden="true"
+            className="w-10 h-10 shrink-0 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-medium text-sm"
+          >
             {participant.name?.charAt(0).toUpperCase() || '?'}
           </div>
-          <div>
+          <div className="min-w-0">
             {isEditingName ? (
-              <div className="flex items-center gap-2">
-                <input
+              <div className="flex items-center gap-1.5">
+                <label htmlFor="participant-name" className="sr-only">
+                  Nome do participante
+                </label>
+                <Input
+                  id="participant-name"
                   ref={nameInputRef}
-                  type="text"
                   value={editedName}
                   onChange={(e) => setEditedName(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleSaveName();
+                    if (e.key === 'Enter') void handleSaveName();
                     if (e.key === 'Escape') handleCancelEdit();
                   }}
-                  className="text-base font-medium border-b-2 border-blue-500 bg-transparent focus:outline-none px-0 py-0.5 w-40"
+                  className="h-8 w-44 text-base font-medium"
                   placeholder="Digite o nome..."
                   disabled={isSavingName}
                 />
-                <button
-                  onClick={handleSaveName}
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => void handleSaveName()}
                   disabled={isSavingName || !editedName.trim()}
-                  className="p-1 text-green-600 hover:text-green-700 disabled:opacity-50"
+                  aria-label="Salvar nome"
+                  className="h-8 w-8"
                 >
                   <Check className="w-4 h-4" />
-                </button>
-                <button
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
                   onClick={handleCancelEdit}
                   disabled={isSavingName}
-                  className="p-1 text-gray-400 hover:text-gray-600"
+                  aria-label="Cancelar edição do nome"
+                  className="h-8 w-8"
                 >
                   <X className="w-4 h-4" />
-                </button>
+                </Button>
               </div>
             ) : (
-              <div className="flex items-center gap-2">
-                <h2
-                  onClick={() => setIsEditingName(true)}
-                  className="text-base font-medium text-gray-900 cursor-pointer hover:text-blue-600"
-                  title="Clique para editar"
-                >
+              // A real button, not an h2 with onClick — the old version was
+              // unreachable by keyboard.
+              <div className="flex items-center gap-1.5 min-w-0">
+                <h2 className="text-base font-medium text-foreground truncate">
                   {participant.name || 'Sem nome'}
                 </h2>
-                <button
+                <Button
+                  size="icon"
+                  variant="ghost"
                   onClick={() => setIsEditingName(true)}
-                  className="p-1 text-gray-400 hover:text-blue-600"
+                  aria-label={`Editar nome de ${participant.name || 'participante sem nome'}`}
+                  className="h-6 w-6 shrink-0"
                 >
                   <Pencil className="w-3 h-3" />
-                </button>
+                </Button>
               </div>
             )}
-            <p className="text-sm text-gray-500">{formatPhone(participant.phone)}</p>
+            <p className="text-sm text-muted-foreground">{formatPhone(participant.phone)}</p>
           </div>
 
-          {/* Status badges */}
-          <div className="flex items-center gap-2 ml-2">
-            {context.operatorMode && (
-              <span className="px-2 py-1 text-xs font-medium bg-purple-100 text-purple-700 rounded-full">
-                Modo Operador
-              </span>
-            )}
+          <div className="flex items-center gap-2 ml-2 flex-wrap">
+            {/* The single most consequential fact about this conversation: can a
+                free-form message even be delivered right now. */}
+            <StatusBadge tone={windowState.tone} dot>
+              {windowState.label}
+            </StatusBadge>
+            {context.operatorMode && <StatusBadge tone="info">Modo operador</StatusBadge>}
             {context.needsHuman && (
-              <span className="px-2 py-1 text-xs font-medium bg-red-100 text-red-700 rounded-full animate-pulse">
-                Precisa Atenção
-              </span>
+              <StatusBadge tone="danger" icon={AlertTriangle}>
+                Precisa atenção
+              </StatusBadge>
             )}
           </div>
         </div>
 
-        {/* Actions */}
         <div className="flex items-center gap-2">
-          {/* Toggle Attention */}
-          <button
+          <Button
+            variant={context.needsHuman ? 'secondary' : 'outline'}
+            size="sm"
             onClick={onToggleAttention}
-            className={`px-3 py-2 text-sm rounded-lg transition-colors flex items-center gap-2 ${
-              context.needsHuman
-                ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                : 'bg-yellow-50 text-yellow-700 hover:bg-yellow-100'
-            }`}
-            title={context.needsHuman ? 'Remover flag' : 'Marcar como precisa atenção'}
+            className="gap-2"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-              />
-            </svg>
-            {context.needsHuman ? 'Resolver' : 'Marcar'}
-          </button>
+            <AlertTriangle className="w-4 h-4" />
+            {context.needsHuman ? 'Resolver' : 'Marcar atenção'}
+          </Button>
 
-          {/* Toggle Details */}
-          <button
+          <Button
+            variant={showDetails ? 'secondary' : 'outline'}
+            size="sm"
             onClick={onToggleDetails}
-            className={`px-3 py-2 text-sm rounded-lg transition-colors flex items-center gap-2 ${
-              showDetails
-                ? 'bg-blue-100 text-blue-700'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-            title={showDetails ? 'Ocultar detalhes' : 'Ver detalhes'}
+            aria-pressed={showDetails}
+            className="gap-2"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
+            <Info className="w-4 h-4" />
             Detalhes
-          </button>
+          </Button>
         </div>
       </div>
     </div>

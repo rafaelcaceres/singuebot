@@ -26,7 +26,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Plus, X } from 'lucide-react';
-import { toast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
 // Schema de validação
 const participantSchema = z.object({
@@ -107,8 +107,7 @@ export const EditParticipantForm: React.FC<EditParticipantFormProps> = ({
         },
       });
 
-      toast({
-        title: "Sucesso!",
+      toast.success("Sucesso!", {
         description: "Participante atualizado com sucesso.",
       });
 
@@ -116,11 +115,7 @@ export const EditParticipantForm: React.FC<EditParticipantFormProps> = ({
       onSuccess?.();
     } catch (error) {
       console.error('Error updating participant:', error);
-      toast({
-        title: "Erro",
-        description: error instanceof Error ? error.message : "Erro ao atualizar participante",
-        variant: "destructive",
-      });
+      toast.error("Erro");
     } finally {
       setIsSubmitting(false);
     }
@@ -181,15 +176,15 @@ export const EditParticipantForm: React.FC<EditParticipantFormProps> = ({
           <div className="space-y-4">
             {/* Phone field (read-only) */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-foreground mb-1">
                 Telefone
               </label>
               <Input
                 value={participant?.phone?.replace('whatsapp:', '') || ''}
                 disabled
-                className="bg-gray-50"
+                className="bg-muted"
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 O telefone não pode ser alterado
               </p>
             </div>
@@ -286,10 +281,11 @@ export const EditParticipantForm: React.FC<EditParticipantFormProps> = ({
                           type="button"
                           variant="outline"
                           size="sm"
+                          aria-label="Adicionar tag"
                           onClick={addTag}
                           disabled={!currentTag.trim() || isSubmitting}
                         >
-                          <Plus className="h-4 w-4" />
+                          <Plus className="h-4 w-4" aria-hidden="true" />
                         </Button>
                       </div>
                       
@@ -301,10 +297,11 @@ export const EditParticipantForm: React.FC<EditParticipantFormProps> = ({
                               <button
                                 type="button"
                                 onClick={() => removeTag(tag)}
-                                className="ml-1 hover:bg-gray-200 rounded-full p-0.5"
+                                aria-label={`Remover tag ${tag}`}
+                                className="ml-1 hover:bg-muted rounded-full p-0.5 focus-visible:ring-2 focus-visible:ring-ring"
                                 disabled={isSubmitting}
                               >
-                                <X className="h-3 w-3" />
+                                <X className="h-3 w-3" aria-hidden="true" />
                               </button>
                             </Badge>
                           ))}

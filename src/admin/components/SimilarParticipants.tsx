@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge, type StatusTone } from '@/components/ui/status-badge';
 import {
   Sparkles,
   TrendingUp,
@@ -36,11 +36,11 @@ export function SimilarParticipants({ participantId, limit = 5 }: SimilarPartici
     navigate(`/participants?highlight=${id}`);
   };
 
-  const getScoreColor = (score: number) => {
-    if (score >= 0.9) return 'text-green-600 bg-green-50';
-    if (score >= 0.7) return 'text-blue-600 bg-blue-50';
-    if (score >= 0.5) return 'text-yellow-600 bg-yellow-50';
-    return 'text-gray-600 bg-gray-50';
+  const getScoreTone = (score: number): StatusTone => {
+    if (score >= 0.9) return 'success';
+    if (score >= 0.7) return 'info';
+    if (score >= 0.5) return 'warning';
+    return 'neutral';
   };
 
   const getScoreLabel = (score: number) => {
@@ -140,12 +140,9 @@ export function SimilarParticipants({ participantId, limit = 5 }: SimilarPartici
                   <span>Similaridade: {getScoreLabel(result.score)}</span>
                 </div>
               </div>
-              <Badge
-                className={getScoreColor(result.score)}
-                variant="secondary"
-              >
+              <StatusBadge tone={getScoreTone(result.score)}>
                 {Math.round(result.score * 100)}%
-              </Badge>
+              </StatusBadge>
             </div>
 
             {/* Professional Info */}

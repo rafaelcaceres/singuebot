@@ -9,7 +9,6 @@ import { KnowledgePage } from "./admin/pages/KnowledgePage";
 import { Participants } from "./admin/pages/Participants";
 import { UserManagement } from "./admin/pages/UserManagement";
 import { TemplatesPage } from "./admin/pages/TemplatesPage";
-import DashboardParticipants from "./admin/pages/DashboardParticipants";
 import { ParticipantExplorer } from "./admin/pages/ParticipantExplorer";
 import { ParticipantProfile } from "./admin/pages/ParticipantProfile";
 import { ParticipantClusters } from "./admin/pages/ParticipantClusters";
@@ -18,30 +17,20 @@ import { OperatorDashboard } from "./admin/pages/OperatorDashboard";
 import { Broadcasts } from "./admin/pages/Broadcasts";
 import { BroadcastDetail } from "./admin/pages/BroadcastDetail";
 import { RequireFlag } from "./admin/components/RequireFlag";
+import { RequireRole } from "./admin/components/RequireRole";
 
-function ImportPage() {
-  return <div className="p-8">Importar CSV - Em desenvolvimento</div>;
-}
-
-function JobsPage() {
-  return <div className="p-8">Jobs & Logs - Em desenvolvimento</div>;
-}
-
-// Component to handle authentication redirects
+/**
+ * Only handles the case AdminLayout can't: bouncing an already-authenticated
+ * user off /login. The unauthenticated guard lives in AdminLayout itself.
+ */
 function AuthRedirectHandler() {
   const { isAuthenticated, isLoading } = useConvexAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
-    if (!isLoading) {
-      if (isAuthenticated && location.pathname === "/login") {
-        // If user is authenticated and on login page, redirect to dashboard
-        void navigate("/", { replace: true });
-      } else if (!isAuthenticated && location.pathname !== "/login" && location.pathname !== "/dashboard-participants") {
-        // If user is not authenticated and not on login page or dashboard-participants, redirect to login
-        void navigate("/login", { replace: true });
-      }
+    if (!isLoading && isAuthenticated && location.pathname === "/login") {
+      void navigate("/", { replace: true });
     }
   }, [isAuthenticated, isLoading, location.pathname, navigate]);
 
@@ -56,28 +45,33 @@ export function AppRouter() {
         {/* Public routes */}
         <Route path="/login" element={
           <Unauthenticated>
-            <div className="min-h-screen flex items-center justify-center bg-background">
-              <div className="max-w-md w-full space-y-8">
-                <div className="text-center">
-                  <h2 className="text-3xl font-bold">WhatsApp AI Assistant</h2>
-                  <p className="mt-2 text-muted-foreground">
-                    Entre para acessar o painel administrativo
-                  </p>
-                </div>
+            <div className="min-h-screen flex items-center justify-center bg-background px-6">
+              <div className="max-w-md w-full">
+                {/* A brand mark, not a second heading — SignInForm owns the
+                    page's h1, and the two used to say the same thing twice. */}
+                <p className="text-center text-sm font-semibold tracking-tight text-muted-foreground mb-8">
+                  Singuê
+                </p>
                 <SignInForm />
               </div>
             </div>
           </Unauthenticated>
         } />
 
-        {/* Public dashboard-participants route */}
-        <Route path="/dashboard-participants" element={<DashboardParticipants />} />
-
-        {/* Main authenticated routes */}
+        {/* Main authenticated routes.
+            The Unauthenticated branch is required, not belt-and-braces: the
+            AdminLayout guard lives *inside* <Authenticated>, which renders
+            nothing when logged out — so without this, a logged-out visitor to
+            any admin URL got a blank page instead of the login screen. */}
         <Route path="/" element={
-          <Authenticated>
-            <AdminLayout />
-          </Authenticated>
+          <>
+            <Authenticated>
+              <AdminLayout />
+            </Authenticated>
+            <Unauthenticated>
+              <Navigate to="/login" replace />
+            </Unauthenticated>
+          </>
         }>
           {/* Dashboard as home page */}
           <Route index element={<Dashboard />} />
@@ -85,21 +79,54 @@ export function AppRouter() {
           {/* Central de Atendimento (substituiu /whatsapp) */}
           <Route path="atendimento" element={<OperatorDashboard />} />
 
-          {/* Admin pages */}
+          {/* Every gate below mirrors what Navigation already declares per item.
+              The sidebar hid these; the URLs stayed open. */}
+          {/* Deliberately NOT gated by enableInterview: the participant roster is
+              the base record, and the broadcast flow starts by selecting from it.
+              Gating it behind the interview flag made "Novo disparo" bounce to
+              the home page whenever interviews were off. */}
           <Route path="participants" element={<Participants />} />
           <Route path="participants/:id" element={<ParticipantProfile />} />
-          <Route path="relations" element={<ParticipantExplorer />} />
-          <Route path="clusters" element={<ParticipantClusters />} />
+          <Route
+            path="relations"
+            element={
+              <RequireFlag flag="enableParticipantRAG">
+                <ParticipantExplorer />
+              </RequireFlag>
+            }
+          />
+          <Route
+            path="clusters"
+            element={
+              <RequireFlag flag="enableClustering">
+                <ParticipantClusters />
+              </RequireFlag>
+            }
+          />
           <Route path="conversations" element={<Conversations />} />
-          <Route path="knowledge" element={<KnowledgePage />} />
-          <Route path="users" element={<UserManagement />} />
-          {/* Feature flags gate the route itself, not just the nav link — the nav
-              item was already flag-gated while the URL stayed reachable. */}
+          <Route
+            path="knowledge"
+            element={
+              <RequireRole roles={["owner", "editor"]}>
+                <KnowledgePage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="users"
+            element={
+              <RequireRole roles={["owner"]}>
+                <UserManagement />
+              </RequireRole>
+            }
+          />
           <Route
             path="templates"
             element={
               <RequireFlag flag="enableTemplates">
-                <TemplatesPage />
+                <RequireRole roles={["owner", "editor"]}>
+                  <TemplatesPage />
+                </RequireRole>
               </RequireFlag>
             }
           />
@@ -119,9 +146,14 @@ export function AppRouter() {
               </RequireFlag>
             }
           />
-          <Route path="import" element={<ImportPage />} />
-          <Route path="jobs" element={<JobsPage />} />
-          <Route path="settings" element={<SettingsPage />} />
+          <Route
+            path="settings"
+            element={
+              <RequireRole roles={["owner"]}>
+                <SettingsPage />
+              </RequireRole>
+            }
+          />
         </Route>
 
         {/* Catch-all route for unauthenticated users */}

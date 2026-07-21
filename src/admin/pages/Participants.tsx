@@ -16,12 +16,17 @@ import {
 import { Plus, MessageSquare, Upload } from 'lucide-react';
 import { api } from '../../../convex/_generated/api';
 import { Id } from '../../../convex/_generated/dataModel';
-import { ConversationViewer } from '../components/ConversationViewer';
 import { AddParticipantForm } from '../components/AddParticipantForm';
 import { EditParticipantForm } from '../components/EditParticipantForm';
 import { BroadcastComposer } from '../components/BroadcastComposer';
 import { ImportParticipantsModal } from '../components/ImportParticipantsModal';
 import { usePermissions } from '../../hooks/useAuth';
+import { DeleteConfirmationModal } from '../components/DeleteConfirmationModal';
+import { Button } from '@/components/ui/button';
+import { PageHeader } from '../components/PageHeader';
+import { toast } from 'sonner';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { stageLabel, stageTone } from '@/admin/lib/stages';
 
 interface Participant {
   _id: string;
@@ -50,7 +55,8 @@ export const Participants: React.FC = () => {
     pageIndex: 0,
     pageSize: 25,
   });
-  const [selectedParticipant, setSelectedParticipant] = useState<string | null>(null);
+  const [deletingParticipantId, setDeletingParticipantId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [isAddParticipantOpen, setIsAddParticipantOpen] = useState(false);
   const [editParticipantId, setEditParticipantId] = useState<string | null>(null);
   
@@ -113,6 +119,8 @@ export const Participants: React.FC = () => {
   
   const isIndeterminate = selectedParticipants.size > 0 && !isAllSelected;
 
+  const hasSelection = selectedParticipants.size > 0;
+
   const columns = useMemo<ColumnDef<Participant, any>[]>(
     () => [
       // Checkbox column
@@ -126,7 +134,8 @@ export const Participants: React.FC = () => {
               if (el) el.indeterminate = isIndeterminate;
             }}
             onChange={(e) => handleSelectAll(e.target.checked)}
-            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            aria-label="Selecionar todos os participantes desta página"
+            className="rounded border-input text-primary focus:ring-ring focus-visible:ring-2 focus-visible:ring-ring"
           />
         ),
         cell: ({ row }) => (
@@ -134,7 +143,8 @@ export const Participants: React.FC = () => {
             type="checkbox"
             checked={selectedParticipants.has(row.original._id)}
             onChange={(e) => handleSelectParticipant(row.original._id, e.target.checked)}
-            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            aria-label={`Selecionar ${row.original.name || row.original.phone.replace('whatsapp:', '')}`}
+            className="rounded border-input text-primary focus:ring-ring focus-visible:ring-2 focus-visible:ring-ring"
           />
         ),
       }),
@@ -155,36 +165,7 @@ export const Participants: React.FC = () => {
         header: 'Estágio',
         cell: (info) => {
           const stage = info.getValue();
-          const stageLabels: Record<string, string> = {
-            not_started: 'Não iniciado',
-            intro: 'Introdução',
-            termos_aceite: 'Termos & Confirmação',
-            mapeamento_carreira: 'Mapeamento de Carreira',
-    momento_carreira: 'Momento de Carreira',
-    expectativas_evento: 'Expectativas do Evento',
-    objetivo_principal: 'Objetivo Principal',
-            finalizacao: 'Finalização',
-          };
-          
-          const getStageColor = (stageValue: string) => {
-            switch (stageValue) {
-              case 'not_started': return 'bg-gray-100 text-gray-800';
-              case 'intro': return 'bg-blue-100 text-blue-800';
-              case 'termos_aceite': return 'bg-green-100 text-green-800';
-              case 'mapeamento_carreira': return 'bg-purple-100 text-purple-800';
-      case 'momento_carreira': return 'bg-purple-100 text-purple-800';
-      case 'expectativas_evento': return 'bg-indigo-100 text-indigo-800';
-      case 'objetivo_principal': return 'bg-pink-100 text-pink-800';
-              case 'finalizacao': return 'bg-emerald-100 text-emerald-800';
-              default: return 'bg-gray-100 text-gray-800';
-            }
-          };
-
-          return (
-            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStageColor(stage)}`}>
-              {stageLabels[stage] || stage}
-            </span>
-          );
+          return <StatusBadge tone={stageTone(stage)}>{stageLabel(stage)}</StatusBadge>;
         },
         enableSorting: true,
       }),
@@ -236,34 +217,44 @@ export const Participants: React.FC = () => {
         id: 'actions',
         header: 'Ações',
         cell: (info) => (
-          <div className="flex space-x-2">
-            <button
-              onClick={() => navigate(`/participants/${info.row.original._id}`)}
-              className="text-purple-600 hover:text-purple-800 text-sm font-medium"
+          <div className="flex items-center gap-1">
+            <Button
+              variant="link"
+              size="sm"
+              className="h-auto p-0"
+              onClick={() => void navigate(`/participants/${info.row.original._id}`)}
             >
-              Ver Perfil
-            </button>
-            <button
-              onClick={() => setSelectedParticipant(info.row.original._id)}
-              className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+              Perfil
+            </Button>
+            <Button
+              variant="link"
+              size="sm"
+              className="h-auto p-0 ml-2"
+              onClick={() =>
+                void navigate(`/atendimento?participant=${info.row.original._id}`)
+              }
             >
               Conversa
-            </button>
+            </Button>
             {canManageUsers && (
-              <button
+              <Button
+                variant="link"
+                size="sm"
+                className="h-auto p-0 ml-2"
                 onClick={() => setEditParticipantId(info.row.original._id)}
-                className="text-green-600 hover:text-green-800 text-sm font-medium"
               >
                 Editar
-              </button>
+              </Button>
             )}
             {canDeleteData && (
-              <button
-                onClick={() => void handleDeleteParticipant(info.row.original._id)}
-                className="text-red-600 hover:text-red-800 text-sm font-medium"
+              <Button
+                variant="link"
+                size="sm"
+                className="h-auto p-0 ml-2 text-destructive"
+                onClick={() => setDeletingParticipantId(info.row.original._id)}
               >
                 Excluir
-              </button>
+              </Button>
             )}
           </div>
         ),
@@ -293,18 +284,22 @@ export const Participants: React.FC = () => {
     pageCount: Math.ceil((participantsData?.total || 0) / pagination.pageSize),
   });
 
-  const handleDeleteParticipant = async (participantId: string) => {
-    if (!confirm('Tem certeza que deseja excluir este participante? Esta ação não pode ser desfeita.')) {
-      return;
-    }
-    
+  const handleDeleteParticipant = async () => {
+    if (!deletingParticipantId) return;
+
+    setIsDeleting(true);
     try {
-      await deleteParticipantMutation({ participantId: participantId as any });
-      // Refresh data by triggering a re-fetch
-      window.location.reload();
+      await deleteParticipantMutation({
+        participantId: deletingParticipantId as Id<'participants'>,
+      });
+      setDeletingParticipantId(null);
+      toast.success('Participante excluído');
     } catch (error) {
-      console.error('Error deleting participant:', error);
-      alert('Erro ao excluir participante. Tente novamente.');
+      toast.error('Não foi possível excluir o participante', {
+        description: error instanceof Error ? error.message : 'Tente novamente.',
+      });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -345,76 +340,75 @@ export const Participants: React.FC = () => {
   if (!canManageUsers) {
     return (
       <div className="flex items-center justify-center h-64">
-        <p className="text-gray-500">Você não tem permissão para ver os participantes.</p>
+        <p className="text-muted-foreground">Você não tem permissão para ver os participantes.</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">Participantes</h1>
-        <div className="flex space-x-3">
-          {selectedParticipants.size > 0 && (
-            <button
-              onClick={() => setIsComposerOpen(true)}
-              className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 flex items-center gap-2"
-            >
-              <MessageSquare className="h-4 w-4" />
-              Criar disparo ({selectedParticipants.size})
-            </button>
-          )}
-          {canManageUsers && (
-            <>
-              <button
-                onClick={() => setIsImportModalOpen(true)}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 flex items-center gap-2"
-              >
-                <Upload className="h-4 w-4" />
-                Importar CSV
-              </button>
-              <button
-                onClick={() => setIsAddParticipantOpen(true)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center gap-2"
-              >
-                <Plus className="h-4 w-4" />
-                Adicionar Participante
-              </button>
-            </>
-          )}
-          <button
-            onClick={handleExportData}
-            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
-          >
-            Exportar dados
-          </button>
-        </div>
-      </div>
+      {/* One primary action at a time, and which one depends on context: with a
+          selection active, sending to those people is why the selection exists,
+          so it takes the emphasis away from "Adicionar". */}
+      <PageHeader
+        title="Participantes"
+        description="O cadastro base do programa. Selecione para disparar ou editar."
+        actions={
+          <>
+            {hasSelection && (
+              <Button onClick={() => setIsComposerOpen(true)}>
+                <MessageSquare className="h-4 w-4 mr-2" aria-hidden="true" />
+                Criar disparo ({selectedParticipants.size})
+              </Button>
+            )}
+            {canManageUsers && (
+              <>
+                <Button variant="outline" onClick={() => setIsImportModalOpen(true)}>
+                  <Upload className="h-4 w-4 mr-2" aria-hidden="true" />
+                  Importar CSV
+                </Button>
+                <Button
+                  variant={hasSelection ? 'outline' : 'default'}
+                  onClick={() => setIsAddParticipantOpen(true)}
+                >
+                  <Plus className="h-4 w-4 mr-2" aria-hidden="true" />
+                  Adicionar Participante
+                </Button>
+              </>
+            )}
+            <Button variant="outline" onClick={handleExportData}>
+              Exportar dados
+            </Button>
+          </>
+        }
+      />
 
       {/* Filters */}
-      <div className="bg-white p-4 rounded-lg shadow">
+      <div className="bg-card p-4 rounded-lg shadow border border-border">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="participants-search" className="block text-sm font-medium text-foreground mb-1">
               Buscar
             </label>
             <input
+              id="participants-search"
               type="text"
               value={globalFilter}
               onChange={(e) => setGlobalFilter(e.target.value)}
               placeholder="Nome ou telefone..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 bg-background text-foreground border border-input rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
           </div>
-          
+
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="participants-cluster" className="block text-sm font-medium text-foreground mb-1">
               Cluster
             </label>
             <select
+              id="participants-cluster"
               value={clusterFilter}
               onChange={(e) => setClusterFilter(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 bg-background text-foreground border border-input rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <option value="">Todos os clusters</option>
               {clusters?.map((cluster) => (
@@ -426,13 +420,14 @@ export const Participants: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="participants-stage" className="block text-sm font-medium text-foreground mb-1">
               Estágio
             </label>
             <select
+              id="participants-stage"
               value={stageFilter}
               onChange={(e) => setStageFilter(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 bg-background text-foreground border border-input rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <option value="">Todos os estágios</option>
               <option value="not_started">Não iniciado</option>
@@ -450,22 +445,25 @@ export const Participants: React.FC = () => {
       </div>
 
       {/* Table */}
-      <div className="bg-white shadow rounded-lg overflow-hidden">
+      <div className="bg-card shadow rounded-lg border border-border overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y divide-border">
+            <thead className="bg-muted">
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id}>
                   {headerGroup.headers.map((header) => (
                     <th
                       key={header.id}
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                      // nowrap: the table scrolls horizontally, so a wrapped
+                      // header just reads as truncated ("ÚLT / ME") instead of
+                      // signalling there is more to scroll to.
+                      className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap cursor-pointer hover:bg-muted"
                       onClick={header.column.getToggleSortingHandler()}
                     >
                       <div className="flex items-center space-x-1">
                         {flexRender(header.column.columnDef.header, header.getContext())}
                         {header.column.getIsSorted() && (
-                          <span className="text-gray-400">
+                          <span className="text-muted-foreground">
                             {header.column.getIsSorted() === 'desc' ? '↓' : '↑'}
                           </span>
                         )}
@@ -475,11 +473,11 @@ export const Participants: React.FC = () => {
                 </tr>
               ))}
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-card divide-y divide-border">
               {table.getRowModel().rows.map((row) => (
-                <tr key={row.id} className="hover:bg-gray-50">
+                <tr key={row.id} className="hover:bg-muted">
                   {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td key={cell.id} className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>
                   ))}
@@ -490,26 +488,27 @@ export const Participants: React.FC = () => {
         </div>
 
         {/* Pagination */}
-        <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+        <div className="bg-card px-4 py-3 flex items-center justify-between border-t border-border sm:px-6">
           <div className="flex-1 flex justify-between sm:hidden">
-            <button
+            <Button
+              variant="outline"
               onClick={() => table.previousPage()}
               disabled={!table.getCanPreviousPage()}
-              className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
             >
               Anterior
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="outline"
+              className="ml-3"
               onClick={() => table.nextPage()}
               disabled={!table.getCanNextPage()}
-              className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
             >
               Próximo
-            </button>
+            </Button>
           </div>
           <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm text-gray-700">
+              <p className="text-sm text-foreground">
                 Mostrando{' '}
                 <span className="font-medium">
                   {pagination.pageIndex * pagination.pageSize + 1}
@@ -527,48 +526,56 @@ export const Participants: React.FC = () => {
               </p>
             </div>
             <div>
-              <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
-                <button
+              <nav
+                aria-label="Paginação de participantes"
+                className="relative z-0 inline-flex items-center gap-1"
+              >
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => table.setPageIndex(0)}
                   disabled={!table.getCanPreviousPage()}
-                  className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
                 >
                   Primeira
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => table.previousPage()}
                   disabled={!table.getCanPreviousPage()}
-                  className="relative inline-flex items-center px-2 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
                 >
                   Anterior
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => table.nextPage()}
                   disabled={!table.getCanNextPage()}
-                  className="relative inline-flex items-center px-2 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
                 >
                   Próximo
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => table.setPageIndex(table.getPageCount() - 1)}
                   disabled={!table.getCanNextPage()}
-                  className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
                 >
                   Última
-                </button>
+                </Button>
               </nav>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Conversation Viewer Modal */}
-      {selectedParticipant && (
-        <ConversationViewer
-          participantId={selectedParticipant}
-          onClose={() => setSelectedParticipant(null)}
-        />
-      )}
+      <DeleteConfirmationModal
+        isOpen={!!deletingParticipantId}
+        onClose={() => setDeletingParticipantId(null)}
+        onConfirm={handleDeleteParticipant}
+        isLoading={isDeleting}
+        title="Excluir participante?"
+        message="Além do cadastro, o histórico de conversa, a entrevista e o perfil deste participante serão apagados. Esta ação não pode ser desfeita."
+      />
 
       {/* Add Participant Modal */}
       <AddParticipantForm
@@ -581,21 +588,14 @@ export const Participants: React.FC = () => {
         open={!!editParticipantId}
         onOpenChange={(open) => !open && setEditParticipantId(null)}
         participantId={editParticipantId as any}
-        onSuccess={() => {
-          setEditParticipantId(null);
-          // Refresh data by triggering a re-fetch
-          window.location.reload();
-        }}
+        onSuccess={() => setEditParticipantId(null)}
       />
 
       {/* Import Participants Modal */}
       <ImportParticipantsModal
         open={isImportModalOpen}
         onOpenChange={setIsImportModalOpen}
-        onSuccess={() => {
-          // Refresh data by triggering a re-fetch
-          window.location.reload();
-        }}
+        onSuccess={() => setIsImportModalOpen(false)}
       />
 
       {/* Broadcast composer.

@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation } from 'convex/react';
+import { useNavigate } from 'react-router-dom';
 import {
   useReactTable,
   getCoreRowModel,
@@ -13,8 +14,15 @@ import {
 } from '@tanstack/react-table';
 import { Search, Filter, Download, Trash2, MessageSquare, Users, Calendar } from 'lucide-react';
 import { api } from '../../../convex/_generated/api';
-import { ConversationViewer } from '../components/ConversationViewer';
+import { Id } from '../../../convex/_generated/dataModel';
+import { DeleteConfirmationModal } from '../components/DeleteConfirmationModal';
 import { usePermissions } from '../../hooks/useAuth';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { Button } from '@/components/ui/button';
+import { PageHeader } from '../components/PageHeader';
+import { StatCluster } from '../components/StatCluster';
+import { stageLabel, stageTone } from '@/admin/lib/stages';
+import { toast } from 'sonner';
 
 interface Conversation {
   _id: string;
@@ -37,9 +45,18 @@ export const Conversations: React.FC = () => {
     pageIndex: 0,
     pageSize: 25,
   });
-  const [selectedParticipant, setSelectedParticipant] = useState<string | null>(null);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const navigate = useNavigate();
+  const bulkDeleteConversations = useMutation(api.admin.bulkDeleteConversations);
+
+  /** One thread, one place. The table links into the inbox instead of opening a second viewer. */
+  const openConversation = (participantId: string) => {
+    void navigate(`/atendimento?participant=${participantId}`);
+  };
 
   // Filters state
   const [clusterFilter, setClusterFilter] = useState<string>('');
@@ -55,43 +72,91 @@ export const Conversations: React.FC = () => {
   }>({ min: '', max: '' });
 
   // Fetch data
+  const parsedCount = (value: string): number | undefined => {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  };
+
   const conversationsData = useQuery(api.admin.getConversations, {
     limit: pagination.pageSize,
     offset: pagination.pageIndex * pagination.pageSize,
     clusterId: clusterFilter ? clusterFilter as any : undefined,
     stage: stageFilter || undefined,
     hasUnread: unreadFilter === 'true' ? true : unreadFilter === 'false' ? false : undefined,
+    startDate: dateRangeFilter.startDate
+      ? new Date(`${dateRangeFilter.startDate}T00:00:00`).getTime()
+      : undefined,
+    endDate: dateRangeFilter.endDate
+      ? new Date(`${dateRangeFilter.endDate}T23:59:59.999`).getTime()
+      : undefined,
+    minMessages: parsedCount(messageCountFilter.min),
+    maxMessages: parsedCount(messageCountFilter.max),
   });
 
   const clusters = useQuery(api.admin.getClusters);
 
-  // Bulk operations
-  const handleSelectAll = () => {
-    if (selectedRows.size === (conversationsData?.conversations?.length || 0)) {
-      setSelectedRows(new Set());
-    } else {
-      const allIds = new Set(conversationsData?.conversations?.map(c => c._id) || []);
-      setSelectedRows(allIds);
-    }
+  // Selection is kept in our own Set rather than TanStack's row-selection state.
+  // The header checkbox used to *read* `table.getIsAllPageRowsSelected()` while
+  // writing here, so it never appeared checked — two sources of truth for one
+  // control. Everything below reads and writes the same Set.
+  const pageIds = useMemo(
+    () => (conversationsData?.conversations ?? []).map((c) => c._id),
+    [conversationsData]
+  );
+
+  const isAllPageSelected =
+    pageIds.length > 0 && pageIds.every((id) => selectedRows.has(id));
+  const isSomePageSelected = pageIds.some((id) => selectedRows.has(id));
+  const isIndeterminate = isSomePageSelected && !isAllPageSelected;
+
+  // Union/remove only the current page, so paginating never silently drops rows
+  // that the count in the toolbar still claims are selected.
+  const handleSelectAll = (checked: boolean) => {
+    setSelectedRows((previous) => {
+      const next = new Set(previous);
+      for (const id of pageIds) {
+        if (checked) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
   };
 
-  const handleSelectRow = (id: string) => {
-    const newSelected = new Set(selectedRows);
-    if (newSelected.has(id)) {
-      newSelected.delete(id);
-    } else {
-      newSelected.add(id);
-    }
-    setSelectedRows(newSelected);
+  // Functional update: the captured Set goes stale between two clicks landing in
+  // the same render, which silently drops all but the last.
+  const handleSelectRow = (id: string, checked: boolean) => {
+    setSelectedRows((previous) => {
+      const next = new Set(previous);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
   };
 
   const handleBulkDelete = async () => {
-    if (selectedRows.size === 0) return;
-    
-    if (confirm(`Tem certeza que deseja excluir ${selectedRows.size} conversa(s)?`)) {
-      // TODO: Implement bulk delete mutation
-      console.log('Bulk delete:', Array.from(selectedRows));
+    if (selectedRows.size === 0 || isDeleting) return;
+
+    setIsDeleting(true);
+    try {
+      const count = selectedRows.size;
+      await bulkDeleteConversations({
+        participantIds: Array.from(selectedRows) as Id<'participants'>[],
+      });
       setSelectedRows(new Set());
+      setShowDeleteConfirmation(false);
+      toast.success(
+        `Histórico de ${count} conversa${count > 1 ? 's' : ''} em exclusão`,
+        {
+          description:
+            'Os participantes continuam cadastrados. A lista atualiza sozinha ao terminar.',
+        }
+      );
+    } catch (error) {
+      toast.error('Não foi possível excluir as conversas', {
+        description: error instanceof Error ? error.message : 'Tente novamente.',
+      });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -134,13 +199,17 @@ export const Conversations: React.FC = () => {
     () => [
       {
         id: 'select',
-        header: ({ table }) => (
+        header: () => (
           <div className="flex items-center">
             <input
               type="checkbox"
-              checked={table.getIsAllPageRowsSelected()}
-              onChange={handleSelectAll}
-              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              checked={isAllPageSelected}
+              ref={(el) => {
+                if (el) el.indeterminate = isIndeterminate;
+              }}
+              onChange={(e) => handleSelectAll(e.target.checked)}
+              aria-label="Selecionar todas as conversas desta página"
+              className="h-4 w-4 rounded border-input text-primary focus-visible:ring-2 focus-visible:ring-ring"
             />
           </div>
         ),
@@ -149,8 +218,9 @@ export const Conversations: React.FC = () => {
             <input
               type="checkbox"
               checked={selectedRows.has(row.original._id)}
-              onChange={() => handleSelectRow(row.original._id)}
-              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              onChange={(e) => handleSelectRow(row.original._id, e.target.checked)}
+              aria-label={`Selecionar ${row.original.participantName || row.original.participantPhone.replace('whatsapp:', '')}`}
+              className="h-4 w-4 rounded border-input text-primary focus-visible:ring-2 focus-visible:ring-ring"
             />
           </div>
         ),
@@ -161,14 +231,17 @@ export const Conversations: React.FC = () => {
         header: 'Participante',
         cell: (info) => (
           <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
+            <div
+              aria-hidden="true"
+              className="w-8 h-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-medium"
+            >
               {info.getValue() as string ? (info.getValue() as string).charAt(0).toUpperCase() : 'U'}
             </div>
             <div>
-              <p className="font-medium text-gray-900">
+              <p className="font-medium text-foreground">
                 {(info.getValue() as string) || 'Sem nome'}
               </p>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-muted-foreground">
                 {info.row.original.participantPhone.replace('whatsapp:', '')}
               </p>
             </div>
@@ -181,29 +254,7 @@ export const Conversations: React.FC = () => {
         header: 'Estágio',
         cell: (info) => {
           const stage = info.getValue() as string;
-          const stageLabels: Record<string, string> = {
-            not_started: 'Não iniciado',
-            termos_aceite: 'Termos & Confirmação',
-            mapeamento_carreira: 'Mapeamento de Carreira',
-    momento_carreira: 'Momento de Carreira',
-    expectativas_evento: 'Expectativas do Evento',
-    objetivo_principal: 'Objetivo Principal',
-            finalizacao: 'Finalização',
-          };
-          return (
-            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-              stage === 'not_started' ? 'bg-gray-100 text-gray-800' :
-              stage === 'termos_aceite' ? 'bg-green-100 text-green-800' :
-              stage === 'mapeamento_carreira' ? 'bg-purple-100 text-purple-800' :
-              stage === 'momento_carreira' ? 'bg-purple-100 text-purple-800' :
-              stage === 'expectativas_evento' ? 'bg-indigo-100 text-indigo-800' :
-              stage === 'objetivo_principal' ? 'bg-pink-100 text-pink-800' :
-              stage === 'finalizacao' ? 'bg-emerald-100 text-emerald-800' :
-              'bg-green-100 text-green-800'
-            }`}>
-              {stageLabels[stage] || stage}
-            </span>
-          );
+          return <StatusBadge tone={stageTone(stage)}>{stageLabel(stage)}</StatusBadge>;
         },
         enableSorting: true,
       },
@@ -218,11 +269,11 @@ export const Conversations: React.FC = () => {
         header: 'Mensagens',
         cell: (info) => (
           <div className="flex items-center space-x-2">
-            <span className="text-gray-900">{info.getValue() as number}</span>
+            <span className="text-foreground">{info.getValue() as number}</span>
             {info.row.original.unreadCount > 0 && (
-              <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">
+              <StatusBadge tone="danger">
                 {info.row.original.unreadCount} nova{info.row.original.unreadCount > 1 ? 's' : ''}
-              </span>
+              </StatusBadge>
             )}
           </div>
         ),
@@ -249,8 +300,8 @@ export const Conversations: React.FC = () => {
           
           return (
             <div>
-              <p className="text-sm text-gray-900">{timeAgo}</p>
-              <p className="text-xs text-gray-500">
+              <p className="text-sm text-foreground">{timeAgo}</p>
+              <p className="text-xs text-muted-foreground">
                 {date.toLocaleDateString('pt-BR', {
                   day: '2-digit',
                   month: '2-digit',
@@ -267,16 +318,21 @@ export const Conversations: React.FC = () => {
         id: 'actions',
         header: 'Ações',
         cell: (info) => (
-          <button
-            onClick={() => setSelectedParticipant(info.row.original.participantId)}
-            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+          <Button
+            variant="link"
+            size="sm"
+            className="h-auto p-0"
+            onClick={() => openConversation(info.row.original.participantId)}
           >
             Ver conversa
-          </button>
+          </Button>
         ),
       },
     ],
-    []
+    // These were memoized with an empty dep array, so every cell closed over the
+    // first render's (empty) selection: `checked` never updated and clicking a
+    // second checkbox rebuilt the Set from the stale one, dropping the first.
+    [selectedRows, isAllPageSelected, isIndeterminate]
   );
 
   const table = useReactTable({
@@ -305,8 +361,8 @@ export const Conversations: React.FC = () => {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Acesso negado</h3>
-          <p className="text-gray-500">Você não tem permissão para visualizar conversas.</p>
+          <h3 className="text-lg font-medium text-foreground mb-2">Acesso negado</h3>
+          <p className="text-muted-foreground">Você não tem permissão para visualizar conversas.</p>
         </div>
       </div>
     );
@@ -314,83 +370,88 @@ export const Conversations: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">Conversas</h1>
-        <div className="flex items-center space-x-3">
-          {selectedRows.size > 0 && (
-            <div className="flex items-center space-x-2 bg-blue-50 px-3 py-2 rounded-lg">
-              <span className="text-sm text-blue-700 font-medium">
-                {selectedRows.size} selecionada(s)
-              </span>
-              <button
-                 onClick={() => void handleBulkDelete()}
-                 className="text-red-600 hover:text-red-800 p-1"
-                 title="Excluir selecionadas"
-               >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            </div>
-          )}
-          <button
-             onClick={() => void handleExportData()}
-             className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-           >
-            <Download className="h-4 w-4" />
-            <span>Exportar</span>
-          </button>
-          <button
-            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
-              showAdvancedFilters 
-                ? 'bg-blue-600 text-white' 
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            <Filter className="h-4 w-4" />
-            <span>Filtros Avançados</span>
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        title="Conversas"
+        description="Todas as conversas dos participantes. Abra uma para ver a thread completa."
+        actions={
+          <>
+            {selectedRows.size > 0 && (
+              <div className="flex items-center gap-2 bg-primary/10 px-3 py-1.5 rounded-md">
+                <span className="text-sm text-primary font-medium">
+                  {selectedRows.size} selecionada(s)
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowDeleteConfirmation(true)}
+                  aria-label="Excluir conversas selecionadas"
+                  title="Excluir selecionadas"
+                  className="h-8 w-8 text-destructive hover:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+            <Button variant="outline" onClick={() => void handleExportData()}>
+              <Download className="h-4 w-4 mr-2" />
+              Exportar
+            </Button>
+            <Button
+              variant={showAdvancedFilters ? 'default' : 'secondary'}
+              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+              aria-pressed={showAdvancedFilters}
+            >
+              <Filter className="h-4 w-4 mr-2" />
+              Filtros Avançados
+            </Button>
+          </>
+        }
+      />
 
       {/* Basic Search */}
-      <div className="bg-white p-4 rounded-lg shadow-sm border">
+      <div className="bg-card p-4 rounded-lg shadow-sm border border-border">
         <div className="flex items-center space-x-4">
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <label htmlFor="conversations-search" className="sr-only">
+              Buscar conversas
+            </label>
+            <Search
+              aria-hidden="true"
+              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4"
+            />
             <input
+              id="conversations-search"
               type="text"
               value={globalFilter}
               onChange={(e) => setGlobalFilter(e.target.value)}
               placeholder="Buscar por nome, telefone ou ID..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full pl-10 pr-4 py-2 bg-background text-foreground border border-input rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
           </div>
           {(globalFilter || clusterFilter || stageFilter || unreadFilter ||
             dateRangeFilter.startDate || dateRangeFilter.endDate ||
             messageCountFilter.min || messageCountFilter.max) && (
-            <button
-              onClick={clearAllFilters}
-              className="px-4 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50"
-            >
+            <Button variant="outline" onClick={clearAllFilters}>
               Limpar Filtros
-            </button>
+            </Button>
           )}
         </div>
       </div>
 
       {/* Advanced Filters */}
       {showAdvancedFilters && (
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Filtros Avançados</h3>
+        <div className="bg-card p-6 rounded-lg shadow-sm border border-border">
+          <h3 className="text-lg font-medium text-foreground mb-4">Filtros Avançados</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="filter-cluster" className="block text-sm font-medium text-foreground mb-1">
                 Cluster
               </label>
               <select
+                id="filter-cluster"
                 value={clusterFilter}
                 onChange={(e) => setClusterFilter(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 bg-background text-foreground border border-input rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <option value="">Todos os clusters</option>
                 {clusters?.map((cluster) => (
@@ -402,13 +463,14 @@ export const Conversations: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="filter-stage" className="block text-sm font-medium text-foreground mb-1">
                 Estágio
               </label>
               <select
+                id="filter-stage"
                 value={stageFilter}
                 onChange={(e) => setStageFilter(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 bg-background text-foreground border border-input rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <option value="">Todos os estágios</option>
                 <option value="not_started">Não iniciado</option>
@@ -422,13 +484,14 @@ export const Conversations: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="filter-unread" className="block text-sm font-medium text-foreground mb-1">
                 Mensagens não lidas
               </label>
               <select
+                id="filter-unread"
                 value={unreadFilter}
                 onChange={(e) => setUnreadFilter(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 bg-background text-foreground border border-input rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <option value="">Todas</option>
                 <option value="true">Com não lidas</option>
@@ -437,116 +500,102 @@ export const Conversations: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="filter-start-date" className="block text-sm font-medium text-foreground mb-1">
                 Data inicial
               </label>
               <input
+                id="filter-start-date"
                 type="date"
                 value={dateRangeFilter.startDate}
                 onChange={(e) => setDateRangeFilter(prev => ({ ...prev, startDate: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 bg-background text-foreground border border-input rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="filter-end-date" className="block text-sm font-medium text-foreground mb-1">
                 Data final
               </label>
               <input
+                id="filter-end-date"
                 type="date"
                 value={dateRangeFilter.endDate}
                 onChange={(e) => setDateRangeFilter(prev => ({ ...prev, endDate: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 bg-background text-foreground border border-input rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="filter-min-messages" className="block text-sm font-medium text-foreground mb-1">
                 Mín. mensagens
               </label>
               <input
+                id="filter-min-messages"
                 type="number"
                 value={messageCountFilter.min}
                 onChange={(e) => setMessageCountFilter(prev => ({ ...prev, min: e.target.value }))}
                 placeholder="0"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 bg-background text-foreground border border-input rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="filter-max-messages" className="block text-sm font-medium text-foreground mb-1">
                 Máx. mensagens
               </label>
               <input
+                id="filter-max-messages"
                 type="number"
                 value={messageCountFilter.max}
                 onChange={(e) => setMessageCountFilter(prev => ({ ...prev, max: e.target.value }))}
                 placeholder="999"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 bg-background text-foreground border border-input rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               />
             </div>
           </div>
         </div>
       )}
 
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-lg shadow-sm border">
-          <div className="flex items-center">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <MessageSquare className="h-6 w-6 text-blue-600" />
-            </div>
-            <div className="ml-3">
-              <p className="text-sm font-medium text-gray-500">Total de Conversas</p>
-              <p className="text-2xl font-bold text-gray-900">{conversationsData?.total || 0}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-lg shadow-sm border">
-          <div className="flex items-center">
-            <div className="p-2 bg-red-100 rounded-lg">
-              <Users className="h-6 w-6 text-red-600" />
-            </div>
-            <div className="ml-3">
-              <p className="text-sm font-medium text-gray-500">Não Lidas</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {conversationsData?.conversations?.filter(c => c.unreadCount > 0).length || 0}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-lg shadow-sm border">
-          <div className="flex items-center">
-            <div className="p-2 bg-yellow-100 rounded-lg">
-              <Calendar className="h-6 w-6 text-yellow-600" />
-            </div>
-            <div className="ml-3">
-              <p className="text-sm font-medium text-gray-500">Hoje</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {conversationsData?.conversations?.filter(c => {
-                  const today = new Date();
-                  const messageDate = new Date(c.lastMessageAt);
-                  return messageDate.toDateString() === today.toDateString();
-                }).length || 0}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
+      <StatCluster
+        className="md:grid-cols-3"
+        stats={[
+          {
+            label: "Total de conversas",
+            value: conversationsData?.total || 0,
+            icon: MessageSquare,
+          },
+          {
+            label: "Não lidas",
+            value:
+              conversationsData?.conversations?.filter((c) => c.unreadCount > 0).length || 0,
+            icon: Users,
+            tone: "danger",
+          },
+          {
+            label: "Hoje",
+            value:
+              conversationsData?.conversations?.filter((c) => {
+                const today = new Date();
+                const messageDate = new Date(c.lastMessageAt);
+                return messageDate.toDateString() === today.toDateString();
+              }).length || 0,
+            icon: Calendar,
+            tone: "warning",
+          },
+        ]}
+      />
 
       {/* Table */}
-      <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
+      <div className="bg-card rounded-lg shadow-sm border border-border overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y divide-border">
+            <thead className="bg-muted">
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id}>
                   {headerGroup.headers.map((header) => (
                     <th
                       key={header.id}
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                      className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer hover:bg-muted"
                       onClick={header.column.getToggleSortingHandler()}
                     >
                       <div className="flex items-center space-x-1">
@@ -554,7 +603,7 @@ export const Conversations: React.FC = () => {
                           {flexRender(header.column.columnDef.header, header.getContext())}
                         </span>
                         {header.column.getIsSorted() && (
-                          <span className="text-blue-500">
+                          <span className="text-primary">
                             {header.column.getIsSorted() === 'desc' ? '↓' : '↑'}
                           </span>
                         )}
@@ -564,9 +613,9 @@ export const Conversations: React.FC = () => {
                 </tr>
               ))}
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-card divide-y divide-border">
               {table.getRowModel().rows.map((row) => (
-                <tr key={row.id} className="hover:bg-gray-50">
+                <tr key={row.id} className="hover:bg-muted">
                   {row.getVisibleCells().map((cell) => (
                     <td key={cell.id} className="px-6 py-4 whitespace-nowrap">
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -579,26 +628,27 @@ export const Conversations: React.FC = () => {
         </div>
 
         {/* Pagination */}
-        <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+        <div className="bg-card px-4 py-3 flex items-center justify-between border-t border-border sm:px-6">
           <div className="flex-1 flex justify-between sm:hidden">
-            <button
+            <Button
+              variant="outline"
               onClick={() => table.previousPage()}
               disabled={!table.getCanPreviousPage()}
-              className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Anterior
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="outline"
+              className="ml-3"
               onClick={() => table.nextPage()}
               disabled={!table.getCanNextPage()}
-              className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Próximo
-            </button>
+            </Button>
           </div>
           <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm text-gray-700">
+              <p className="text-sm text-foreground">
                 Mostrando{' '}
                 <span className="font-medium">
                   {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1}
@@ -615,51 +665,63 @@ export const Conversations: React.FC = () => {
               </p>
             </div>
             <div>
-              <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
-                <button
+              <nav
+                aria-label="Paginação de conversas"
+                className="relative z-0 inline-flex items-center gap-1"
+              >
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => table.setPageIndex(0)}
                   disabled={!table.getCanPreviousPage()}
-                  className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  aria-label="Primeira página"
                 >
-                  ««
-                </button>
-                <button
+                  <span aria-hidden="true">««</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => table.previousPage()}
                   disabled={!table.getCanPreviousPage()}
-                  className="relative inline-flex items-center px-2 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  aria-label="Página anterior"
                 >
-                  «
-                </button>
-                <span className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+                  <span aria-hidden="true">«</span>
+                </Button>
+                <span className="px-3 text-sm font-medium text-foreground">
                   Página {table.getState().pagination.pageIndex + 1} de {table.getPageCount()}
                 </span>
-                <button
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => table.nextPage()}
                   disabled={!table.getCanNextPage()}
-                  className="relative inline-flex items-center px-2 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  aria-label="Próxima página"
                 >
-                  »
-                </button>
-                <button
+                  <span aria-hidden="true">»</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => table.setPageIndex(table.getPageCount() - 1)}
                   disabled={!table.getCanNextPage()}
-                  className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  aria-label="Última página"
                 >
-                  »»
-                </button>
+                  <span aria-hidden="true">»»</span>
+                </Button>
               </nav>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Conversation Viewer Modal */}
-      {selectedParticipant && (
-        <ConversationViewer
-          participantId={selectedParticipant}
-          onClose={() => setSelectedParticipant(null)}
-        />
-      )}
+      <DeleteConfirmationModal
+        isOpen={showDeleteConfirmation}
+        onClose={() => setShowDeleteConfirmation(false)}
+        onConfirm={handleBulkDelete}
+        isLoading={isDeleting}
+        title={`Excluir histórico de ${selectedRows.size} conversa${selectedRows.size > 1 ? 's' : ''}?`}
+        message="As mensagens trocadas serão apagadas permanentemente. Os participantes, seus perfis e as entrevistas continuam cadastrados — só o histórico da conversa é removido."
+      />
     </div>
   );
 };

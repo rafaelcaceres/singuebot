@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { stageLabel, stageTone } from '@/admin/lib/stages';
 
 interface ParticipantDetailsProps {
   participant: {
@@ -34,14 +36,16 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
   return (
-    <div className="border-b border-gray-200">
+    <div className="border-b border-border">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-50 transition-colors"
+        aria-expanded={isOpen}
+        className="w-full px-4 py-3 flex items-center justify-between text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
       >
-        <span className="font-medium text-gray-900">{title}</span>
+        <span className="font-medium text-foreground">{title}</span>
         <svg
-          className={`w-5 h-5 text-gray-500 transition-transform ${
+          aria-hidden="true"
+          className={`w-5 h-5 text-muted-foreground transition-transform ${
             isOpen ? 'rotate-180' : ''
           }`}
           fill="none"
@@ -66,8 +70,8 @@ const DetailRow: React.FC<{ label: string; value: React.ReactNode }> = ({
   value,
 }) => (
   <div className="flex justify-between py-1.5">
-    <span className="text-sm text-gray-500">{label}</span>
-    <span className="text-sm text-gray-900 text-right">{value || '-'}</span>
+    <span className="text-sm text-muted-foreground">{label}</span>
+    <span className="text-sm text-foreground text-right">{value || '-'}</span>
   </div>
 );
 
@@ -89,21 +93,10 @@ export const ParticipantDetails: React.FC<ParticipantDetailsProps> = ({
     });
   };
 
-  const stageLabels: Record<string, string> = {
-    not_started: 'Não iniciado',
-    termos_aceite: 'Termos & Confirmação',
-    mapeamento_carreira: 'Mapeamento de Carreira',
-    momento_carreira: 'Momento de Carreira',
-    expectativas_evento: 'Expectativas do Evento',
-    objetivo_principal: 'Objetivo Principal',
-    finalizacao: 'Finalização',
-    intro: 'Introdução',
-  };
-
   return (
-    <div className="w-80 border-l border-gray-200 bg-white overflow-y-auto">
-      <div className="p-4 border-b border-gray-200 bg-gray-50">
-        <h3 className="font-semibold text-gray-900">Detalhes do Participante</h3>
+    <div className="w-80 border-l border-border bg-card overflow-y-auto">
+      <div className="p-4 border-b border-border bg-muted">
+        <h3 className="font-semibold text-foreground">Detalhes do Participante</h3>
       </div>
 
       {/* Personal Data */}
@@ -113,15 +106,9 @@ export const ParticipantDetails: React.FC<ParticipantDetailsProps> = ({
         <DetailRow
           label="Consentimento LGPD"
           value={
-            <span
-              className={`px-2 py-0.5 rounded text-xs ${
-                participant.consent
-                  ? 'bg-green-100 text-green-700'
-                  : 'bg-red-100 text-red-700'
-              }`}
-            >
+            <StatusBadge tone={participant.consent ? 'success' : 'danger'}>
               {participant.consent ? 'Sim' : 'Não'}
-            </span>
+            </StatusBadge>
           }
         />
         <DetailRow label="Cargo" value={participant.cargo} />
@@ -131,9 +118,7 @@ export const ParticipantDetails: React.FC<ParticipantDetailsProps> = ({
           label="Cluster"
           value={
             cluster ? (
-              <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">
-                {cluster.name}
-              </span>
+              <StatusBadge tone="info">{cluster.name}</StatusBadge>
             ) : (
               '-'
             )
@@ -141,15 +126,12 @@ export const ParticipantDetails: React.FC<ParticipantDetailsProps> = ({
         />
         {participant.tags.length > 0 && (
           <div className="mt-2">
-            <span className="text-sm text-gray-500">Tags:</span>
+            <span className="text-sm text-muted-foreground">Tags:</span>
             <div className="flex flex-wrap gap-1 mt-1">
               {participant.tags.map((tag, index) => (
-                <span
-                  key={index}
-                  className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs"
-                >
+                <StatusBadge key={index} tone="neutral">
                   {tag}
-                </span>
+                </StatusBadge>
               ))}
             </div>
           </div>
@@ -168,11 +150,11 @@ export const ParticipantDetails: React.FC<ParticipantDetailsProps> = ({
           label="Estágio atual"
           value={
             session ? (
-              <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs">
-                {stageLabels[session.step] || session.step}
-              </span>
+              <StatusBadge tone={stageTone(session.step)}>
+                {stageLabel(session.step)}
+              </StatusBadge>
             ) : (
-              'Não iniciado'
+              <StatusBadge tone="neutral">Não iniciado</StatusBadge>
             )
           }
         />
@@ -183,34 +165,34 @@ export const ParticipantDetails: React.FC<ParticipantDetailsProps> = ({
         <CollapsibleSection title="Perfil">
           {profile.realizacoes && (
             <div className="mb-3">
-              <span className="text-xs font-medium text-gray-500 uppercase">
+              <span className="text-xs font-medium text-muted-foreground uppercase">
                 Realizações
               </span>
-              <p className="text-sm text-gray-900 mt-1">{profile.realizacoes}</p>
+              <p className="text-sm text-foreground mt-1">{profile.realizacoes}</p>
             </div>
           )}
           {profile.visaoFuturo && (
             <div className="mb-3">
-              <span className="text-xs font-medium text-gray-500 uppercase">
+              <span className="text-xs font-medium text-muted-foreground uppercase">
                 Visão de Futuro
               </span>
-              <p className="text-sm text-gray-900 mt-1">{profile.visaoFuturo}</p>
+              <p className="text-sm text-foreground mt-1">{profile.visaoFuturo}</p>
             </div>
           )}
           {profile.desafiosAtuais && (
             <div className="mb-3">
-              <span className="text-xs font-medium text-gray-500 uppercase">
+              <span className="text-xs font-medium text-muted-foreground uppercase">
                 Desafios Atuais
               </span>
-              <p className="text-sm text-gray-900 mt-1">{profile.desafiosAtuais}</p>
+              <p className="text-sm text-foreground mt-1">{profile.desafiosAtuais}</p>
             </div>
           )}
           {profile.motivacao && (
             <div className="mb-3">
-              <span className="text-xs font-medium text-gray-500 uppercase">
+              <span className="text-xs font-medium text-muted-foreground uppercase">
                 Motivação
               </span>
-              <p className="text-sm text-gray-900 mt-1">{profile.motivacao}</p>
+              <p className="text-sm text-foreground mt-1">{profile.motivacao}</p>
             </div>
           )}
         </CollapsibleSection>

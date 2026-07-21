@@ -1,22 +1,26 @@
-import React from "react";
 import { Outlet, Navigate, useLocation } from "react-router-dom";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Navigation } from "../components/Navigation";
 import { SignOutButton } from "../../SignOutButton";
+import { ThemeToggle } from "../../components/ThemeToggle";
+
+/**
+ * Routes that are full-height workspaces rather than documents: they manage
+ * their own scrolling regions and must not sit inside the padded, scrolling
+ * container the rest of the console uses.
+ */
+const FULL_BLEED_ROUTES = ["/atendimento"];
 
 export function AdminLayout() {
-  const location = useLocation();
   const loggedInUser = useQuery(api.auth.loggedInUser);
+  const location = useLocation();
 
-  console.log("AdminLayout rendering...", { 
-    location: location.pathname, 
-    loggedInUser,
-    userStatus: loggedInUser === undefined ? 'loading' : loggedInUser === null ? 'not-logged' : 'logged-in'
-  });
+  const isFullBleed = FULL_BLEED_ROUTES.some(
+    (route) => location.pathname === route || location.pathname.startsWith(`${route}/`)
+  );
 
   if (loggedInUser === undefined) {
-    console.log("AdminLayout: User loading...");
     return (
       <div className="flex justify-center items-center min-h-screen bg-background">
         <div className="text-center space-y-4">
@@ -28,27 +32,35 @@ export function AdminLayout() {
   }
 
   if (loggedInUser === null) {
-    console.log("AdminLayout: User not logged in, redirecting to login");
     return <Navigate to="/login" replace />;
   }
 
-  console.log("AdminLayout: User logged in, rendering layout");
-
+  // A real app shell: the viewport is the frame, and scrolling happens inside
+  // <main>. Before this the root was `min-h-screen` with nothing constraining
+  // height, so `overflow-auto` never engaged — a long message thread grew the
+  // whole document instead of scrolling in place.
   return (
-    <div className="min-h-screen bg-background">
-      <div className="flex">
-        <Navigation />
-        <div className="flex-1 flex flex-col">
-          <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-sm h-16 flex justify-between items-center border-b shadow-sm px-6">
-            <h2 className="text-xl font-semibold text-primary">WhatsApp AI Assistant</h2>
-            <SignOutButton />
-          </header>
-          <main className="flex-1 overflow-auto">
+    <div className="h-screen flex overflow-hidden bg-background">
+      <Navigation />
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* The sidebar already carries the product name — this bar carries the
+            account and its controls, not a second logo. */}
+        <header className="shrink-0 h-16 flex justify-end items-center gap-2 border-b border-border bg-background px-6">
+          <span className="text-sm text-muted-foreground mr-1 truncate max-w-[16rem]">
+            {loggedInUser.email ?? loggedInUser.name ?? "Sessão ativa"}
+          </span>
+          <ThemeToggle />
+          <SignOutButton />
+        </header>
+        <main className={`flex-1 min-h-0 ${isFullBleed ? "overflow-hidden" : "overflow-auto"}`}>
+          {isFullBleed ? (
+            <Outlet />
+          ) : (
             <div className="container mx-auto px-6 py-8">
               <Outlet />
             </div>
-          </main>
-        </div>
+          )}
+        </main>
       </div>
     </div>
   );

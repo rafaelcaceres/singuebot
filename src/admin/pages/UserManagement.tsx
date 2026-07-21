@@ -3,7 +3,9 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "../components/PageHeader";
+import { StatCluster } from "../components/StatCluster";
+import { StatusBadge, type StatusTone } from "@/components/ui/status-badge";
 import {
   Dialog,
   DialogContent,
@@ -34,7 +36,7 @@ import {
   CheckCircle,
   AlertCircle
 } from "lucide-react";
-import { useToast } from '@/hooks/use-toast';
+import { toast } from "sonner";
 import { useAuth, usePermissions } from '../../hooks/useAuth';
 
 type UserRole = 'owner' | 'editor' | 'viewer';
@@ -51,7 +53,6 @@ interface NewOrganizerForm {
 }
 
 export const UserManagement: React.FC = () => {
-  const { toast } = useToast();
   const { user } = useAuth();
   const { canManageUsers, isOwner } = usePermissions();
   
@@ -71,10 +72,8 @@ export const UserManagement: React.FC = () => {
 
   const handleAddOrganizer = async () => {
     if (!newOrganizer.email.trim()) {
-      toast({
-        title: "Email obrigatório",
+      toast.error("Email obrigatório", {
         description: "Por favor, insira um email válido.",
-        variant: "destructive",
       });
       return;
     }
@@ -85,18 +84,15 @@ export const UserManagement: React.FC = () => {
         role: newOrganizer.role,
       });
 
-      toast({
-        title: "Organizador adicionado",
+      toast.success("Organizador adicionado", {
         description: `${newOrganizer.email} foi adicionado com o papel ${getRoleLabel(newOrganizer.role)}.`,
       });
 
       setNewOrganizer({ email: '', role: 'viewer' });
       setIsAddDialogOpen(false);
     } catch (error) {
-      toast({
-        title: "Erro ao adicionar organizador",
+      toast.error("Erro ao adicionar organizador", {
         description: "Não foi possível adicionar o organizador. Tente novamente.",
-        variant: "destructive",
       });
     }
   };
@@ -111,17 +107,14 @@ export const UserManagement: React.FC = () => {
         role: role,
       });
 
-      toast({
-        title: "Papel atualizado",
+      toast.success("Papel atualizado", {
         description: `O papel de ${organizer.email} foi alterado para ${getRoleLabel(role)}.`,
       });
 
       setEditingOrganizer(null);
     } catch (error) {
-      toast({
-        title: "Erro ao atualizar papel",
+      toast.error("Erro ao atualizar papel", {
         description: "Não foi possível atualizar o papel do organizador.",
-        variant: "destructive",
       });
     }
   };
@@ -130,15 +123,12 @@ export const UserManagement: React.FC = () => {
     try {
       await deleteOrganizer({ organizerId: organizerId as any });
 
-      toast({
-        title: "Organizador removido",
+      toast.success("Organizador removido", {
         description: "O organizador foi removido com sucesso.",
       });
     } catch (error) {
-      toast({
-        title: "Erro ao remover organizador",
+      toast.error("Erro ao remover organizador", {
         description: "Não foi possível remover o organizador.",
-        variant: "destructive",
       });
     }
   };
@@ -146,11 +136,11 @@ export const UserManagement: React.FC = () => {
   const getRoleIcon = (role: UserRole) => {
     switch (role) {
       case 'owner':
-        return <Crown className="h-4 w-4 text-yellow-500" />;
+        return <Crown className="h-4 w-4 text-warning" />;
       case 'editor':
-        return <Edit className="h-4 w-4 text-blue-500" />;
+        return <Edit className="h-4 w-4 text-primary" />;
       case 'viewer':
-        return <Eye className="h-4 w-4 text-gray-500" />;
+        return <Eye className="h-4 w-4 text-muted-foreground" />;
     }
   };
 
@@ -165,14 +155,14 @@ export const UserManagement: React.FC = () => {
     }
   };
 
-  const getRoleBadgeVariant = (role: UserRole) => {
+  const getRoleTone = (role: UserRole): StatusTone => {
     switch (role) {
       case 'owner':
-        return 'default';
+        return 'warning';
       case 'editor':
-        return 'secondary';
+        return 'info';
       case 'viewer':
-        return 'outline';
+        return 'neutral';
     }
   };
 
@@ -212,63 +202,27 @@ export const UserManagement: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Gerenciamento de Usuários</h1>
-          <p className="text-muted-foreground">
-            Gerencie organizadores e suas permissões no sistema
-          </p>
-        </div>
-        {isOwner && (
-          <Button onClick={() => setIsAddDialogOpen(true)}>
-            <UserPlus className="h-4 w-4 mr-2" />
-            Adicionar Organizador
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        title="Usuários"
+        description="Organizadores e suas permissões no console."
+        actions={
+          isOwner && (
+            <Button onClick={() => setIsAddDialogOpen(true)}>
+              <UserPlus className="h-4 w-4 mr-2" />
+              Adicionar Organizador
+            </Button>
+          )
+        }
+      />
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total de Organizadores</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{organizers.length}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Proprietários</CardTitle>
-            <Crown className="h-4 w-4 text-yellow-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">{roleStats.owner}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Editores</CardTitle>
-            <Edit className="h-4 w-4 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{roleStats.editor}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Visualizadores</CardTitle>
-            <Eye className="h-4 w-4 text-gray-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-600">{roleStats.viewer}</div>
-          </CardContent>
-        </Card>
-      </div>
+      <StatCluster
+        stats={[
+          { label: "Organizadores", value: organizers.length, icon: Users },
+          { label: "Proprietários", value: roleStats.owner, icon: Crown, tone: "warning" },
+          { label: "Editores", value: roleStats.editor, icon: Edit, tone: "primary" },
+          { label: "Visualizadores", value: roleStats.viewer, icon: Eye, tone: "muted" },
+        ]}
+      />
 
       {/* Organizers List */}
       <Card>
@@ -309,9 +263,7 @@ export const UserManagement: React.FC = () => {
                       <div className="flex items-center space-x-2">
                         <h4 className="font-medium">{organizer.email}</h4>
                         {user?.email === organizer.email && (
-                          <Badge variant="outline" className="text-xs">
-                            Você
-                          </Badge>
+                          <StatusBadge tone="neutral">Você</StatusBadge>
                         )}
                       </div>
                       <p className="text-sm text-muted-foreground">
@@ -321,29 +273,34 @@ export const UserManagement: React.FC = () => {
                   </div>
                   
                   <div className="flex items-center space-x-2">
-                    <Badge variant={getRoleBadgeVariant(organizer.role) as any}>
+                    <StatusBadge tone={getRoleTone(organizer.role)} dot>
                       {getRoleLabel(organizer.role)}
-                    </Badge>
+                    </StatusBadge>
                     
                     {isOwner && user?.email !== organizer.email && (
                       <div className="flex items-center space-x-2">
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           size="sm"
                           onClick={() => setEditingOrganizer(organizer)}
+                          aria-label={`Editar papel de ${organizer.email}`}
+                          title="Editar papel"
                         >
                           <Settings className="h-4 w-4" />
                         </Button>
-                        
-                        <Button 
-                           variant="outline" 
-                           size="sm"
-                           onClick={() => {
-                             void handleDeleteOrganizer(organizer._id);
-                           }}
-                         >
-                           <Trash2 className="h-4 w-4" />
-                         </Button>
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            void handleDeleteOrganizer(organizer._id);
+                          }}
+                          aria-label={`Remover organizador ${organizer.email}`}
+                          title="Remover organizador"
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     )}
                   </div>
@@ -366,24 +323,24 @@ export const UserManagement: React.FC = () => {
           <div className="grid gap-6 md:grid-cols-3">
             <div className="space-y-3">
               <div className="flex items-center space-x-2">
-                <Crown className="h-5 w-5 text-yellow-500" />
+                <Crown className="h-5 w-5 text-warning" />
                 <h3 className="font-semibold">Proprietário</h3>
               </div>
               <ul className="space-y-1 text-sm text-muted-foreground">
                 <li className="flex items-center space-x-2">
-                  <CheckCircle className="h-3 w-3 text-green-500" />
+                  <CheckCircle className="h-3 w-3 text-success" />
                   <span>Gerenciar usuários e permissões</span>
                 </li>
                 <li className="flex items-center space-x-2">
-                  <CheckCircle className="h-3 w-3 text-green-500" />
+                  <CheckCircle className="h-3 w-3 text-success" />
                   <span>Configurações do sistema</span>
                 </li>
                 <li className="flex items-center space-x-2">
-                  <CheckCircle className="h-3 w-3 text-green-500" />
+                  <CheckCircle className="h-3 w-3 text-success" />
                   <span>Excluir dados permanentemente</span>
                 </li>
                 <li className="flex items-center space-x-2">
-                  <CheckCircle className="h-3 w-3 text-green-500" />
+                  <CheckCircle className="h-3 w-3 text-success" />
                   <span>Todas as funcionalidades</span>
                 </li>
               </ul>
@@ -391,24 +348,24 @@ export const UserManagement: React.FC = () => {
             
             <div className="space-y-3">
               <div className="flex items-center space-x-2">
-                <Edit className="h-5 w-5 text-blue-500" />
+                <Edit className="h-5 w-5 text-primary" />
                 <h3 className="font-semibold">Editor</h3>
               </div>
               <ul className="space-y-1 text-sm text-muted-foreground">
                 <li className="flex items-center space-x-2">
-                  <CheckCircle className="h-3 w-3 text-green-500" />
+                  <CheckCircle className="h-3 w-3 text-success" />
                   <span>Editar conteúdo e templates</span>
                 </li>
                 <li className="flex items-center space-x-2">
-                  <CheckCircle className="h-3 w-3 text-green-500" />
+                  <CheckCircle className="h-3 w-3 text-success" />
                   <span>Gerenciar participantes</span>
                 </li>
                 <li className="flex items-center space-x-2">
-                  <CheckCircle className="h-3 w-3 text-green-500" />
+                  <CheckCircle className="h-3 w-3 text-success" />
                   <span>Importar dados CSV</span>
                 </li>
                 <li className="flex items-center space-x-2">
-                  <AlertCircle className="h-3 w-3 text-red-500" />
+                  <AlertCircle className="h-3 w-3 text-destructive" />
                   <span>Sem acesso a configurações</span>
                 </li>
               </ul>
@@ -416,24 +373,24 @@ export const UserManagement: React.FC = () => {
             
             <div className="space-y-3">
               <div className="flex items-center space-x-2">
-                <Eye className="h-5 w-5 text-gray-500" />
+                <Eye className="h-5 w-5 text-muted-foreground" />
                 <h3 className="font-semibold">Visualizador</h3>
               </div>
               <ul className="space-y-1 text-sm text-muted-foreground">
                 <li className="flex items-center space-x-2">
-                  <CheckCircle className="h-3 w-3 text-green-500" />
+                  <CheckCircle className="h-3 w-3 text-success" />
                   <span>Ver relatórios e analytics</span>
                 </li>
                 <li className="flex items-center space-x-2">
-                  <CheckCircle className="h-3 w-3 text-green-500" />
+                  <CheckCircle className="h-3 w-3 text-success" />
                   <span>Visualizar conversas</span>
                 </li>
                 <li className="flex items-center space-x-2">
-                  <AlertCircle className="h-3 w-3 text-red-500" />
+                  <AlertCircle className="h-3 w-3 text-destructive" />
                   <span>Sem permissão de edição</span>
                 </li>
                 <li className="flex items-center space-x-2">
-                  <AlertCircle className="h-3 w-3 text-red-500" />
+                  <AlertCircle className="h-3 w-3 text-destructive" />
                   <span>Sem acesso a configurações</span>
                 </li>
               </ul>
@@ -474,19 +431,19 @@ export const UserManagement: React.FC = () => {
                 <SelectContent>
                   <SelectItem value="owner">
                     <div className="flex items-center space-x-2">
-                      <Crown className="h-4 w-4 text-yellow-500" />
+                      <Crown className="h-4 w-4 text-warning" />
                       <span>Proprietário</span>
                     </div>
                   </SelectItem>
                   <SelectItem value="editor">
                     <div className="flex items-center space-x-2">
-                      <Edit className="h-4 w-4 text-blue-500" />
+                      <Edit className="h-4 w-4 text-primary" />
                       <span>Editor</span>
                     </div>
                   </SelectItem>
                   <SelectItem value="viewer">
                     <div className="flex items-center space-x-2">
-                      <Eye className="h-4 w-4 text-gray-500" />
+                      <Eye className="h-4 w-4 text-muted-foreground" />
                       <span>Visualizador</span>
                     </div>
                   </SelectItem>
@@ -534,19 +491,19 @@ export const UserManagement: React.FC = () => {
                 <SelectContent>
                   <SelectItem value="owner">
                     <div className="flex items-center space-x-2">
-                      <Crown className="h-4 w-4 text-yellow-500" />
+                      <Crown className="h-4 w-4 text-warning" />
                       <span>Proprietário</span>
                     </div>
                   </SelectItem>
                   <SelectItem value="editor">
                     <div className="flex items-center space-x-2">
-                      <Edit className="h-4 w-4 text-blue-500" />
+                      <Edit className="h-4 w-4 text-primary" />
                       <span>Editor</span>
                     </div>
                   </SelectItem>
                   <SelectItem value="viewer">
                     <div className="flex items-center space-x-2">
-                      <Eye className="h-4 w-4 text-gray-500" />
+                      <Eye className="h-4 w-4 text-muted-foreground" />
                       <span>Visualizador</span>
                     </div>
                   </SelectItem>

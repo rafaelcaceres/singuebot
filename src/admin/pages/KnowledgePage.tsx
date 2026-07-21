@@ -4,7 +4,7 @@ import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
-import { Badge } from "../../components/ui/badge";
+import { StatusBadge } from "../../components/ui/status-badge";
 import { Progress } from "../../components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { 
@@ -17,7 +17,18 @@ import {
   Clock
 } from "lucide-react";
 import { UploadDocuments } from "../components/UploadDocuments";
-import { useToast } from '@/hooks/use-toast';
+import { DeleteConfirmationModal } from "../components/DeleteConfirmationModal";
+import { PageHeader } from "../components/PageHeader";
+import { StatCluster } from "../components/StatCluster";
+import { toast } from "sonner";
+
+const JOB_STATUS_LABELS: Record<string, string> = {
+  pending: "Na fila",
+  processing: "Processando",
+  running: "Processando",
+  completed: "Concluído",
+  failed: "Falhou",
+};
 
 interface Document {
   _id: Id<"knowledge_docs">;
@@ -28,7 +39,6 @@ interface Document {
 }
 
 export const KnowledgePage: React.FC = () => {
-  const { toast } = useToast();
   const [selectedTab, setSelectedTab] = useState("documents");
 
   // Get active bot config for namespace
@@ -44,20 +54,18 @@ export const KnowledgePage: React.FC = () => {
   const reindexDocument = useMutation(api.admin.reindexDocument);
   const reindexNamespace = useAction(api.admin.reindexNamespace);
   const [isReindexingAll, setIsReindexingAll] = useState(false);
+  const [isReindexAllConfirmOpen, setIsReindexAllConfirmOpen] = useState(false);
 
   const handleDeleteDocument = async (documentId: string) => {
     try {
       await deleteDocument({ documentId: documentId as Id<"knowledge_docs"> });
-      toast({
-        title: "Documento excluído",
+      toast.success("Documento excluído", {
         description: "O documento foi removido com sucesso.",
       });
     } catch (error) {
       console.error("Error deleting document:", error);
-      toast({
-        title: "Erro ao excluir documento: " + documentId,
+      toast.error("Erro ao excluir documento: ", {
         description: "Não foi possível excluir o documento.",
-        variant: "destructive",
       });
     }
   };
@@ -65,31 +73,22 @@ export const KnowledgePage: React.FC = () => {
   const handleReindexDocument = async (documentId: string) => {
     try {
       await reindexDocument({ documentId: documentId as Id<"knowledge_docs"> });
-      toast({
-        title: "Reindexação iniciada",
+      toast.success("Reindexação iniciada", {
         description: "O documento será reprocessado em breve.",
       });
     } catch (error) {
-      toast({
-        title: "Erro ao reindexar",
+      toast.error("Erro ao reindexar", {
         description: "Não foi possível reindexar o documento.",
-        variant: "destructive",
       });
     }
   };
 
   const handleReindexAll = async () => {
     if (!namespace) {
-      toast({
-        title: "Bot não configurado",
+      toast.error("Bot não configurado", {
         description: "Selecione um bot com namespace RAG configurado.",
-        variant: "destructive",
       });
-      return;
-    }
-    if (!window.confirm(
-      "Isso vai apagar embeddings órfãos e reprocessar todos os documentos da base. Continuar?"
-    )) {
+      setIsReindexAllConfirmOpen(false);
       return;
     }
     setIsReindexingAll(true);
@@ -101,44 +100,37 @@ export const KnowledgePage: React.FC = () => {
       ];
       if (result.skipped.length > 0) parts.push(`${result.skipped.length} sem conteúdo (re-upload)`);
       if (result.failed.length > 0) parts.push(`${result.failed.length} falharam`);
-      toast({
-        title: "Reindexação concluída",
-        description: parts.join(" • "),
-        variant: result.failed.length > 0 ? "destructive" : "default",
-      });
+      toast.success("Reindexação concluída");
       if (result.skipped.length > 0 || result.failed.length > 0) {
         console.warn("Reindex report", result);
       }
     } catch (error) {
-      toast({
-        title: "Erro na reindexação",
-        description: error instanceof Error ? error.message : "Falha desconhecida.",
-        variant: "destructive",
-      });
+      toast.error("Erro na reindexação");
       console.error("Error reindexing all documents:", error);
     } finally {
       setIsReindexingAll(false);
+      setIsReindexAllConfirmOpen(false);
     }
   };
 
   const getStatusIcon = (status: Document["status"]) => {
     switch (status) {
       case "ingested":
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
+        return <CheckCircle className="h-4 w-4 text-success" />;
       case "pending":
-        return <Clock className="h-4 w-4 text-yellow-500" />;
+        return <Clock className="h-4 w-4 text-warning" />;
       case "failed":
-        return <AlertCircle className="h-4 w-4 text-red-500" />;
+        return <AlertCircle className="h-4 w-4 text-destructive" />;
       default:
-        return <Upload className="h-4 w-4 text-blue-500" />;
+        return <Upload className="h-4 w-4 text-primary" />;
     }
   };
 
   const getStatusBadge = (status: Document["status"]) => {
-    const variants = {
-      ingested: "default" as const,
-      pending: "secondary" as const,
-      failed: "destructive" as const,
+    const tones = {
+      ingested: "success" as const,
+      pending: "warning" as const,
+      failed: "danger" as const,
     };
 
     const labels = {
@@ -147,11 +139,7 @@ export const KnowledgePage: React.FC = () => {
       failed: "Erro",
     };
 
-    return (
-      <Badge variant={variants[status]}>
-        {labels[status]}
-      </Badge>
-    );
+    return <StatusBadge tone={tones[status]} dot>{labels[status]}</StatusBadge>;
   };
 
   const formatDate = (timestamp: number) => {
@@ -164,67 +152,29 @@ export const KnowledgePage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Base de Conhecimento</h1>
-          <p className="text-muted-foreground">
-            Gerencie documentos para melhorar as respostas da IA
-          </p>
-        </div>
-        <div className="flex gap-2">
+      <PageHeader
+        title="Conhecimento"
+        description="Gerencie documentos para melhorar as respostas da IA"
+        actions={
           <Button
             variant="outline"
-            onClick={() => void handleReindexAll()}
+            onClick={() => setIsReindexAllConfirmOpen(true)}
             disabled={documents.length === 0 || !namespace || isReindexingAll}
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${isReindexingAll ? "animate-spin" : ""}`} />
             {isReindexingAll ? "Reindexando..." : "Reindexar Tudo"}
           </Button>
-        </div>
-      </div>
+        }
+      />
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total de Documentos</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{documents.length}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Processados</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{completedDocs.length}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Processando</CardTitle>
-            <Clock className="h-4 w-4 text-yellow-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">{processingDocs.length}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Com Erro</CardTitle>
-            <AlertCircle className="h-4 w-4 text-red-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">{errorDocs.length}</div>
-          </CardContent>
-        </Card>
-      </div>
+      <StatCluster
+        stats={[
+          { label: "Documentos", value: documents.length, icon: FileText },
+          { label: "Processados", value: completedDocs.length, icon: CheckCircle, tone: "success" },
+          { label: "Processando", value: processingDocs.length, icon: Clock, tone: "warning" },
+          { label: "Com erro", value: errorDocs.length, icon: AlertCircle, tone: "danger" },
+        ]}
+      />
 
       <Tabs value={selectedTab} onValueChange={setSelectedTab}>
         <TabsList>
@@ -271,7 +221,7 @@ export const KnowledgePage: React.FC = () => {
                             <span>Enviado em {formatDate(doc.createdAt)}</span>
                           </div>
                           {doc.status === "failed" && (
-                            <p className="text-sm text-red-500 mt-1">Falha no processamento</p>
+                            <p className="text-sm text-destructive mt-1">Falha no processamento</p>
                           )}
                         </div>
                       </div>
@@ -284,14 +234,19 @@ export const KnowledgePage: React.FC = () => {
                           size="sm"
                           onClick={() => void handleReindexDocument(doc._id)}
                           disabled={doc.status === "pending"}
+                          aria-label={`Reindexar documento ${doc.title}`}
+                          title="Reindexar documento"
                         >
                           <RefreshCw className="h-4 w-4" />
                         </Button>
-                        
+
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => void handleDeleteDocument(doc._id)}
+                          aria-label={`Excluir documento ${doc.title}`}
+                          title="Excluir documento"
+                          className="text-destructive hover:text-destructive"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -331,7 +286,7 @@ export const KnowledgePage: React.FC = () => {
                     <div key={job._id} className="p-4 border rounded-lg">
                       <div className="flex items-center justify-between mb-2">
                         <h4 className="font-medium">{job.title}</h4>
-                        <Badge variant="secondary">{job.status}</Badge>
+                        <StatusBadge tone="info">{JOB_STATUS_LABELS[job.status] ?? job.status}</StatusBadge>
                       </div>
                       <Progress value={job.progress} className="mb-2" />
                       <p className="text-sm text-muted-foreground">
@@ -345,6 +300,18 @@ export const KnowledgePage: React.FC = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <DeleteConfirmationModal
+        isOpen={isReindexAllConfirmOpen}
+        onClose={() => setIsReindexAllConfirmOpen(false)}
+        onConfirm={handleReindexAll}
+        isLoading={isReindexingAll}
+        tone="default"
+        confirmLabel="Reindexar"
+        loadingLabel="Reindexando..."
+        title="Reindexar toda a base?"
+        message="Isso vai apagar embeddings órfãos e reprocessar todos os documentos da base. Continuar?"
+      />
     </div>
   );
 };

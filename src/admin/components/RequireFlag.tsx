@@ -21,7 +21,7 @@ export const RequireFlag: React.FC<{
   const flags = useQuery(api.functions.botConfig.getFeatureFlags);
 
   if (flags === undefined) {
-    return <div className="p-8 text-sm text-gray-500">Carregando...</div>;
+    return <div className="p-8 text-sm text-muted-foreground">Carregando...</div>;
   }
 
   if (!flags[flag]) {

@@ -18,6 +18,8 @@ import { Id } from '../../../convex/_generated/dataModel';
 import { DeleteConfirmationModal } from '../components/DeleteConfirmationModal';
 import { TemplateConfigModal } from '../components/TemplateConfigModal';
 import { usePermissions } from '../../hooks/useAuth';
+import { StatusBadge, type StatusTone } from '@/components/ui/status-badge';
+import { Button } from '@/components/ui/button';
 
 interface Template {
   _id: Id<"templates">;
@@ -41,12 +43,12 @@ interface SyncResult {
   conflicts: Array<{ twilioId: string; friendlyName: string; reason: string }>;
 }
 
-const APPROVAL_STYLES: Record<string, string> = {
-  approved: 'bg-green-100 text-green-800',
-  pending: 'bg-yellow-100 text-yellow-800',
-  rejected: 'bg-red-100 text-red-800',
-  unsubmitted: 'bg-gray-100 text-gray-700',
-  archived_remote: 'bg-orange-100 text-orange-800',
+const APPROVAL_TONES: Record<string, StatusTone> = {
+  approved: 'success',
+  pending: 'warning',
+  rejected: 'danger',
+  unsubmitted: 'neutral',
+  archived_remote: 'warning',
 };
 
 const APPROVAL_LABELS: Record<string, string> = {
@@ -107,31 +109,23 @@ export const TemplatesPage: React.FC = () => {
     columnHelper.accessor('name', {
       header: 'Nome',
       cell: (info) => (
-        <div className="font-medium text-gray-900">
+        <div className="font-medium text-foreground">
           {info.getValue()}
         </div>
       ),
     }),
     columnHelper.accessor('locale', {
       header: 'Idioma',
-      cell: (info) => (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-          {info.getValue()}
-        </span>
-      ),
+      cell: (info) => <StatusBadge tone="info">{info.getValue()}</StatusBadge>,
     }),
     columnHelper.accessor('approvalStatus', {
       header: 'Aprovação',
       cell: (info) => {
         const status = info.getValue() ?? 'unsubmitted';
         return (
-          <span
-            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-              APPROVAL_STYLES[status] ?? 'bg-gray-100 text-gray-700'
-            }`}
-          >
+          <StatusBadge tone={APPROVAL_TONES[status] ?? 'neutral'} dot>
             {APPROVAL_LABELS[status] ?? status}
-          </span>
+          </StatusBadge>
         );
       },
     }),
@@ -140,9 +134,9 @@ export const TemplatesPage: React.FC = () => {
       header: 'Mensagem',
       cell: (info) => {
         const body = info.row.original.twilioStructure?.body;
-        if (!body) return <span className="text-xs text-gray-400">—</span>;
+        if (!body) return <span className="text-xs text-muted-foreground">—</span>;
         return (
-          <p className="text-xs text-gray-600 max-w-sm line-clamp-2" title={body}>
+          <p className="text-xs text-muted-foreground max-w-sm line-clamp-2" title={body}>
             {body}
           </p>
         );
@@ -153,12 +147,9 @@ export const TemplatesPage: React.FC = () => {
       cell: (info) => (
         <div className="flex flex-wrap gap-1">
           {info.getValue().map((variable, index) => (
-            <span
-              key={index}
-              className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-800"
-            >
+            <StatusBadge key={index} tone="neutral">
               {variable}
-            </span>
+            </StatusBadge>
           ))}
         </div>
       ),
@@ -166,7 +157,7 @@ export const TemplatesPage: React.FC = () => {
     columnHelper.accessor('twilioId', {
       header: 'Twilio ID',
       cell: (info) => (
-        <code className="text-xs bg-gray-100 px-2 py-1 rounded">
+        <code className="text-xs bg-muted text-muted-foreground px-2 py-1 rounded">
           {info.getValue()}
         </code>
       ),
@@ -174,7 +165,7 @@ export const TemplatesPage: React.FC = () => {
     columnHelper.accessor('_creationTime', {
       header: 'Criado em',
       cell: (info) => (
-        <span className="text-sm text-gray-500">
+        <span className="text-sm text-muted-foreground">
           {new Date(info.getValue()).toLocaleDateString('pt-BR')}
         </span>
       ),
@@ -183,25 +174,29 @@ export const TemplatesPage: React.FC = () => {
       id: 'actions',
       header: 'Ações',
       cell: (info) => (
-        <div className="flex items-center space-x-2">
-          {/* Temporarily showing buttons for testing - remove canManageUsers check */}
-          <button
-            onClick={() => setConfiguringTemplate(info.row.original)}
-            className="text-green-600 hover:text-green-900 p-1 rounded hover:bg-green-50"
-            title="Configurar template"
-          >
-            <Settings className="h-4 w-4" />
-          </button>
+        <div className="flex items-center space-x-1">
           {canManageUsers && (
             <>
-
-              <button
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setConfiguringTemplate(info.row.original)}
+                aria-label={`Configurar template ${info.row.original.name}`}
+                title="Configurar template"
+                className="h-8 w-8"
+              >
+                <Settings className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={() => setDeletingTemplate(info.row.original)}
-                className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50"
+                aria-label={`Excluir template ${info.row.original.name}`}
                 title="Excluir template"
+                className="h-8 w-8 text-destructive hover:text-destructive"
               >
                 <Trash2 className="h-4 w-4" />
-              </button>
+              </Button>
             </>
           )}
         </div>
@@ -241,46 +236,45 @@ export const TemplatesPage: React.FC = () => {
     <div className="p-8">
       <div className="sm:flex sm:items-center">
         <div className="sm:flex-auto">
-          <h1 className="text-2xl font-semibold text-gray-900">Templates HSM</h1>
-          <p className="mt-2 text-sm text-gray-700">
+          <h1 className="text-2xl font-semibold text-foreground">Templates HSM</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
             Templates são criados e aprovados no Twilio. Aqui você os sincroniza e
             define de quais campos do participante cada variável é preenchida.
           </p>
           {lastSyncedAt && (
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-muted-foreground">
               Última sincronização: {new Date(lastSyncedAt).toLocaleString('pt-BR')}
             </p>
           )}
         </div>
         {canManageUsers && (
           <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
-            <button
-              onClick={() => void handleSync()}
-              disabled={isSyncing}
-              className="inline-flex items-center justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 sm:w-auto"
-            >
+            <Button onClick={() => void handleSync()} disabled={isSyncing}>
               <RefreshCw className={`h-4 w-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
               {isSyncing ? 'Sincronizando...' : 'Sincronizar do Twilio'}
-            </button>
+            </Button>
           </div>
         )}
       </div>
 
       {syncError && (
-        <div className="mt-4 rounded-md bg-red-50 p-4 text-sm text-red-800">
+        <div
+          role="alert"
+          className="mt-4 rounded-md bg-destructive-muted p-4 text-sm text-destructive-muted-foreground"
+        >
           {syncError}
         </div>
       )}
 
       {syncResult && (
-        <div className="mt-4 rounded-md bg-blue-50 p-4">
-          <p className="text-sm text-blue-900">
+        <div className="mt-4 rounded-md bg-info-muted p-4">
+          <p className="text-sm text-info-muted-foreground">
             {syncResult.scanned} template(s) lidos no Twilio · {syncResult.created} novo(s) ·{' '}
             {syncResult.updated} atualizado(s)
             {syncResult.archived > 0 && ` · ${syncResult.archived} não existe(m) mais no Twilio`}
           </p>
           {syncResult.conflicts.length > 0 && (
-            <ul className="mt-2 space-y-1 text-xs text-blue-800">
+            <ul className="mt-2 space-y-1 text-xs text-info-muted-foreground">
               {syncResult.conflicts.map((conflict, index) => (
                 <li key={index}>
                   <strong>{conflict.friendlyName}:</strong> {conflict.reason}
@@ -294,14 +288,18 @@ export const TemplatesPage: React.FC = () => {
       {/* Search and Filters */}
       <div className="mt-6 flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
+          <label htmlFor="templates-search" className="sr-only">
+            Buscar templates
+          </label>
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Search className="h-5 w-5 text-gray-400" />
+            <Search aria-hidden="true" className="h-5 w-5 text-muted-foreground" />
           </div>
           <input
+            id="templates-search"
             type="text"
             value={globalFilter ?? ''}
             onChange={(e) => setGlobalFilter(e.target.value)}
-            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            className="block w-full pl-10 pr-3 py-2 border border-input rounded-md leading-5 bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:text-sm"
             placeholder="Buscar templates..."
           />
         </div>
@@ -311,15 +309,15 @@ export const TemplatesPage: React.FC = () => {
       <div className="mt-6 flex flex-col">
         <div className="-my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
           <div className="py-2 align-middle inline-block min-w-full sm:px-6 lg:px-8">
-            <div className="shadow overflow-hidden border-b border-gray-200 sm:rounded-lg">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+            <div className="shadow overflow-hidden border-b border-border sm:rounded-lg">
+              <table className="min-w-full divide-y divide-border">
+                <thead className="bg-muted">
                   {table.getHeaderGroups().map((headerGroup) => (
                     <tr key={headerGroup.id}>
                       {headerGroup.headers.map((header) => (
                         <th
                           key={header.id}
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                          className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer hover:bg-muted"
                           onClick={header.column.getToggleSortingHandler()}
                         >
                           <div className="flex items-center space-x-1">
@@ -329,7 +327,7 @@ export const TemplatesPage: React.FC = () => {
                                 : flexRender(header.column.columnDef.header, header.getContext())}
                             </span>
                             {header.column.getIsSorted() && (
-                              <span className="text-gray-400">
+                              <span className="text-muted-foreground">
                                 {header.column.getIsSorted() === 'desc' ? '↓' : '↑'}
                               </span>
                             )}
@@ -339,11 +337,11 @@ export const TemplatesPage: React.FC = () => {
                     </tr>
                   ))}
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-card divide-y divide-border">
                   {table.getRowModel().rows.map((row) => (
-                    <tr key={row.id} className="hover:bg-gray-50">
+                    <tr key={row.id} className="hover:bg-muted">
                       {row.getVisibleCells().map((cell) => (
-                        <td key={cell.id} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <td key={cell.id} className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
                           {flexRender(cell.column.columnDef.cell, cell.getContext())}
                         </td>
                       ))}
@@ -356,26 +354,27 @@ export const TemplatesPage: React.FC = () => {
         </div>
 
         {/* Pagination */}
-        <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+        <div className="bg-card px-4 py-3 flex items-center justify-between border-t border-border sm:px-6">
           <div className="flex-1 flex justify-between sm:hidden">
-            <button
+            <Button
+              variant="outline"
               onClick={() => table.previousPage()}
               disabled={!table.getCanPreviousPage()}
-              className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
             >
               Anterior
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="outline"
+              className="ml-3"
               onClick={() => table.nextPage()}
               disabled={!table.getCanNextPage()}
-              className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
             >
               Próximo
-            </button>
+            </Button>
           </div>
           <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm text-gray-700">
+              <p className="text-sm text-foreground">
                 Mostrando{' '}
                 <span className="font-medium">
                   {pagination.pageIndex * pagination.pageSize + 1}
@@ -390,35 +389,42 @@ export const TemplatesPage: React.FC = () => {
               </p>
             </div>
             <div>
-              <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
-                <button
+              <nav
+                aria-label="Paginação de templates"
+                className="relative z-0 inline-flex items-center gap-1"
+              >
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => table.setPageIndex(0)}
                   disabled={!table.getCanPreviousPage()}
-                  className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
                 >
                   Primeira
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => table.previousPage()}
                   disabled={!table.getCanPreviousPage()}
-                  className="relative inline-flex items-center px-2 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
                 >
                   Anterior
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => table.nextPage()}
                   disabled={!table.getCanNextPage()}
-                  className="relative inline-flex items-center px-2 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
                 >
                   Próximo
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => table.setPageIndex(table.getPageCount() - 1)}
                   disabled={!table.getCanNextPage()}
-                  className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
                 >
                   Última
-                </button>
+                </Button>
               </nav>
             </div>
           </div>

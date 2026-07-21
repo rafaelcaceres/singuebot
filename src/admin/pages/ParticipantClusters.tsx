@@ -5,6 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
   Loader2,
   AlertCircle,
   RefreshCw,
@@ -16,7 +23,11 @@ import {
   ZoomIn,
   ZoomOut,
   Maximize2,
+  CheckCircle2,
+  Network,
 } from 'lucide-react';
+import { PageHeader } from '../components/PageHeader';
+import { StatCluster } from '../components/StatCluster';
 import {
   ScatterChart,
   Scatter,
@@ -68,7 +79,7 @@ function CustomTooltip({ active, payload }: CustomTooltipProps) {
   const clusterLabel = data.cluster === -1 ? 'Ruído' : `Cluster ${data.cluster + 1}`;
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3 max-w-xs">
+    <div className="bg-card border border-border rounded-lg shadow-lg p-3 max-w-xs">
       <div className="space-y-2">
         <div>
           <p className="font-semibold text-sm">{data.metadata.name || 'Sem nome'}</p>
@@ -83,22 +94,22 @@ function CustomTooltip({ active, payload }: CustomTooltipProps) {
           </Badge>
         </div>
         {data.metadata.cargo && (
-          <p className="text-xs text-gray-600">
+          <p className="text-xs text-muted-foreground">
             <span className="font-medium">Cargo:</span> {data.metadata.cargo}
           </p>
         )}
         {data.metadata.empresa && (
-          <p className="text-xs text-gray-600">
+          <p className="text-xs text-muted-foreground">
             <span className="font-medium">Empresa:</span> {data.metadata.empresa}
           </p>
         )}
         {data.metadata.setor && (
-          <p className="text-xs text-gray-600">
+          <p className="text-xs text-muted-foreground">
             <span className="font-medium">Setor:</span> {data.metadata.setor}
           </p>
         )}
         {data.metadata.programaMarca && (
-          <p className="text-xs text-gray-600">
+          <p className="text-xs text-muted-foreground">
             <span className="font-medium">Programa:</span> {data.metadata.programaMarca}
           </p>
         )}
@@ -222,6 +233,30 @@ export function ParticipantClusters() {
   // Filter points based on selected clusters
   const filteredPoints = result?.points.filter((p) => selectedClusters.has(p.cluster)) || [];
 
+  // The same plot is rendered inline and inside the fullscreen dialog.
+  const renderScatterChart = (height: string) => (
+    <div style={{ width: '100%', height }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis type="number" dataKey="x" name="UMAP-1" />
+          <YAxis type="number" dataKey="y" name="UMAP-2" />
+          <Tooltip content={<CustomTooltip />} />
+          <Scatter
+            name="Participantes"
+            data={filteredPoints}
+            onClick={(data: ClusterPoint) => handlePointClick(data)}
+            cursor="pointer"
+          >
+            {filteredPoints.map((point, index) => (
+              <Cell key={`cell-${index}`} fill={getClusterColor(point.cluster)} opacity={0.8} />
+            ))}
+          </Scatter>
+        </ScatterChart>
+      </ResponsiveContainer>
+    </div>
+  );
+
   if (isAnalyzing) {
     return (
       <div className="p-6">
@@ -285,40 +320,33 @@ export function ParticipantClusters() {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
+    <div className="space-y-6">
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold flex items-center gap-2">
-              <Sparkles className="h-8 w-8 text-primary" />
-              Clusters de Participantes
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Visualização de similaridade usando UMAP + HDBSCAN
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
+        <PageHeader
+          title="Clusters"
+          description="Visualização de similaridade entre participantes (UMAP + HDBSCAN)."
+          actions={
             <Button onClick={handleRefreshCache} variant="outline" disabled={isGeneratingCache}>
               <RefreshCw className={`h-4 w-4 mr-2 ${isGeneratingCache ? 'animate-spin' : ''}`} />
               Regenerar Cache
             </Button>
-          </div>
-        </div>
+          }
+        />
 
         {/* Cache Info */}
         {isCached && cacheCreatedAt && (
-          <Card className="bg-green-50 border-green-200">
+          <Card className="bg-success-muted border-border">
             <CardContent className="pt-4">
               <div className="flex items-center gap-3">
-                <div className="flex-shrink-0">
-                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                </div>
+                <CheckCircle2
+                  className="h-4 w-4 flex-shrink-0 text-success-muted-foreground"
+                  aria-hidden="true"
+                />
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-green-900">
+                  <p className="text-sm font-medium text-success-muted-foreground">
                     Resultados em cache
                   </p>
-                  <p className="text-xs text-green-700">
+                  <p className="text-xs text-success-muted-foreground">
                     Gerado em {new Date(cacheCreatedAt).toLocaleString('pt-BR')}
                     {umapCacheVersion && ` • Versão: ${umapCacheVersion.slice(0, 20)}...`}
                   </p>
@@ -340,34 +368,36 @@ export function ParticipantClusters() {
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">
+                  <label htmlFor="min-cluster-size" className="text-sm font-medium">
                     Tamanho Mínimo do Cluster
                     <span className="text-muted-foreground ml-2">({minClusterSize})</span>
                   </label>
                   <input
+                    id="min-cluster-size"
                     type="range"
                     min="3"
                     max="50"
                     value={minClusterSize}
                     onChange={(e) => handleMinClusterSizeChange(Number(e.target.value))}
-                    className="w-full"
+                    className="w-full accent-primary focus-visible:ring-2 focus-visible:ring-ring"
                   />
                   <p className="text-xs text-muted-foreground">
                     Menor = mais clusters pequenos
                   </p>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">
+                  <label htmlFor="min-samples" className="text-sm font-medium">
                     Amostras Mínimas
                     <span className="text-muted-foreground ml-2">({minSamples})</span>
                   </label>
                   <input
+                    id="min-samples"
                     type="range"
                     min="1"
                     max="20"
                     value={minSamples}
                     onChange={(e) => handleMinSamplesChange(Number(e.target.value))}
-                    className="w-full"
+                    className="w-full accent-primary focus-visible:ring-2 focus-visible:ring-ring"
                   />
                   <p className="text-xs text-muted-foreground">
                     Menor = clusters menos densos
@@ -384,12 +414,12 @@ export function ParticipantClusters() {
               </div>
 
               {!useRecommended && totalParticipants > 0 && (
-                <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                  <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0" />
+                <div className="flex items-center gap-2 p-3 bg-warning-muted text-warning-muted-foreground border border-border rounded-lg">
+                  <AlertCircle className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
                   <div className="flex-1">
-                    <p className="text-sm text-amber-900">
+                    <p className="text-sm">
                       Você está usando parâmetros personalizados.
-                      <span className="ml-1 text-amber-700">
+                      <span className="ml-1">
                         Recomendado: minClusterSize={getRecommendedMinClusterSize()}, minSamples={getRecommendedMinSamples(getRecommendedMinClusterSize())}
                       </span>
                     </p>
@@ -398,7 +428,7 @@ export function ParticipantClusters() {
                     onClick={handleUseRecommended}
                     variant="outline"
                     size="sm"
-                    className="flex-shrink-0 border-amber-300 hover:bg-amber-100"
+                    className="flex-shrink-0"
                   >
                     Usar Recomendados
                   </Button>
@@ -414,41 +444,18 @@ export function ParticipantClusters() {
         </Card>
       </div>
 
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total de Participantes
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{result.totalParticipants}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Clusters Encontrados
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">
-              {result.clusterStats.filter((s) => s.clusterId !== -1).length}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Pontos Selecionados
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{filteredPoints.length}</div>
-          </CardContent>
-        </Card>
-      </div>
+      <StatCluster
+        className="md:grid-cols-3"
+        stats={[
+          { label: "Participantes", value: result.totalParticipants, icon: Users },
+          {
+            label: "Clusters encontrados",
+            value: result.clusterStats.filter((s) => s.clusterId !== -1).length,
+            icon: Network,
+          },
+          { label: "Pontos selecionados", value: filteredPoints.length, icon: Filter },
+        ]}
+      />
 
       {/* Main Content */}
       <div className="grid grid-cols-1  gap-6">
@@ -483,8 +490,9 @@ export function ParticipantClusters() {
                     className={`p-3 rounded-lg border-2 transition-all ${
                       selectedClusters.has(stat.clusterId)
                         ? 'border-primary bg-primary/5'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
+                        : 'border-border hover:border-muted-foreground'
+                    } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
+                    aria-pressed={selectedClusters.has(stat.clusterId)}
                   >
                     <div className="flex items-center justify-between w-full">
                       <div className="flex items-center gap-2">
@@ -505,7 +513,7 @@ export function ParticipantClusters() {
                     </div>
                     {insight && (
                       <div className="mt-2 text-left">
-                        <p className="text-xs text-gray-600">{insight.description}</p>
+                        <p className="text-xs text-muted-foreground">{insight.description}</p>
                         {insight.commonalities.length > 0 && (
                           <div className="mt-1 flex flex-wrap gap-1">
                             {insight.commonalities.slice(0, 2).map((trait, idx) => (
@@ -531,7 +539,7 @@ export function ParticipantClusters() {
         </Card>
 
         {/* Scatter Plot */}
-        <Card className={`lg:col-span-3 ${chartSize === 'fullscreen' ? 'fixed inset-0 z-50 rounded-none' : ''}`}>
+        <Card className="lg:col-span-3">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
@@ -543,42 +551,32 @@ export function ParticipantClusters() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setChartSize(chartSize === 'normal' ? 'fullscreen' : 'normal')}
+                aria-label="Expandir mapa de similaridade"
+                onClick={() => setChartSize('fullscreen')}
               >
                 <Maximize2 className="h-4 w-4" />
               </Button>
             </div>
           </CardHeader>
-          <CardContent>
-            <div style={{ width: '100%', height: chartSize === 'fullscreen' ? 'calc(100vh - 200px)' : '600px' }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <ScatterChart
-                  margin={{ top: 20, right: 20, bottom: 20, left: 20 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" dataKey="x" name="UMAP-1" />
-                  <YAxis type="number" dataKey="y" name="UMAP-2" />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Scatter
-                    name="Participantes"
-                    data={filteredPoints}
-                    onClick={(data: ClusterPoint) => handlePointClick(data)}
-                    cursor="pointer"
-                  >
-                    {filteredPoints.map((point, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={getClusterColor(point.cluster)}
-                        opacity={0.8}
-                      />
-                    ))}
-                  </Scatter>
-                </ScatterChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
+          <CardContent>{renderScatterChart('600px')}</CardContent>
         </Card>
       </div>
+
+      {/* Fullscreen chart */}
+      <Dialog
+        open={chartSize === 'fullscreen'}
+        onOpenChange={(open) => setChartSize(open ? 'fullscreen' : 'normal')}
+      >
+        <DialogContent className="sm:max-w-[95vw] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-lg">Mapa de Similaridade</DialogTitle>
+            <DialogDescription>
+              Cada ponto representa um participante. Pontos próximos são similares.
+            </DialogDescription>
+          </DialogHeader>
+          {renderScatterChart('calc(90vh - 200px)')}
+        </DialogContent>
+      </Dialog>
 
       {/* Cluster Details */}
       <Card>
@@ -606,7 +604,14 @@ export function ParticipantClusters() {
                       {stat.count} participantes ({percentage.toFixed(1)}%)
                     </div>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className="w-full bg-muted rounded-full h-2"
+                    role="progressbar"
+                    aria-valuenow={Math.round(percentage)}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-label={`Participação do cluster ${stat.label}`}
+                  >
                     <div
                       className="h-2 rounded-full transition-all duration-300"
                       style={{

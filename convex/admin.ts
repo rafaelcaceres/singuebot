@@ -753,25 +753,92 @@ export const getConversationMessages = query({
   },
 });
 
-export const sendManualMessage = action({
+/**
+ * Wipe a participant's conversation history while keeping the participant.
+ *
+ * This is deliberately narrower than `deleteParticipant`: the interview session,
+ * the profile and the RAG entry all survive. The coordinator is clearing a
+ * thread, not erasing a person.
+ *
+ * Clearing `threadId` matters — otherwise the assistant keeps replying with
+ * context from messages that no longer exist anywhere in the console.
+ */
+export const deleteConversationHistoryForParticipant = internalMutation({
   args: {
     participantId: v.id("participants"),
-    message: v.string(),
   },
   handler: async (ctx, args) => {
-    // Get participant to find their phone number
-    const participant = await ctx.runQuery(api.admin.getParticipantById, {
-      participantId: args.participantId,
-    });
-    if (!participant) throw new Error("Participant not found");
+    const messages = await ctx.db
+      .query("whatsappMessages")
+      .withIndex("by_participant", (q) => q.eq("participantId", args.participantId))
+      .collect();
 
-    // Send via Twilio (this is what the WhatsApp page does)
-    await ctx.runAction(api.whatsapp.sendMessage, {
-      to: participant.phone,
-      body: args.message,
-    });
+    for (const message of messages) {
+      await ctx.db.delete(message._id);
+    }
 
-    return { success: true };
+    const conversations = await ctx.db
+      .query("conversations")
+      .withIndex("by_participant", (q) => q.eq("participantId", args.participantId))
+      .collect();
+
+    for (const conversation of conversations) {
+      await ctx.db.delete(conversation._id);
+    }
+
+    const genericConversations = await ctx.db
+      .query("genericConversations")
+      .withIndex("by_participant", (q) => q.eq("participantId", args.participantId))
+      .collect();
+
+    for (const genericConversation of genericConversations) {
+      const genericMessages = await ctx.db
+        .query("genericMessages")
+        .withIndex("by_conversation", (q) => q.eq("conversationId", genericConversation._id))
+        .collect();
+
+      for (const genericMessage of genericMessages) {
+        await ctx.db.delete(genericMessage._id);
+      }
+
+      await ctx.db.delete(genericConversation._id);
+    }
+
+    const participant = await ctx.db.get(args.participantId);
+    if (participant?.threadId) {
+      await ctx.db.patch(args.participantId, { threadId: undefined });
+    }
+
+    return {
+      messagesDeleted: messages.length,
+      conversationsDeleted: conversations.length,
+    };
+  },
+});
+
+/**
+ * Bulk-clear conversation history for the participants selected in the
+ * conversations table.
+ *
+ * The argument is participant IDs, not conversation IDs — the table's rows are
+ * keyed by participant. Each participant is scheduled as its own mutation so a
+ * large selection can't blow the per-mutation write limit halfway through and
+ * leave the data half-deleted.
+ */
+export const bulkDeleteConversations = mutation({
+  args: {
+    participantIds: v.array(v.id("participants")),
+  },
+  handler: async (ctx, args) => {
+    for (const participantId of args.participantIds) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.admin.deleteConversationHistoryForParticipant,
+        { participantId },
+      );
+    }
+
+    return { scheduled: args.participantIds.length };
   },
 });
 
@@ -782,6 +849,12 @@ export const getConversations = query({
     clusterId: v.optional(v.id("clusters")),
     stage: v.optional(v.string()),
     hasUnread: v.optional(v.boolean()),
+    // The conversations table always offered these controls; until now they were
+    // collected in the UI and never sent, so the filter panel did nothing.
+    startDate: v.optional(v.number()),
+    endDate: v.optional(v.number()),
+    minMessages: v.optional(v.number()),
+    maxMessages: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const limit = args.limit || 25;
@@ -809,11 +882,18 @@ export const getConversations = query({
       ).length;
 
       const lastMessage = messages[0];
-      
+
       // Get cluster info
-      const cluster = participant.clusterId 
+      const cluster = participant.clusterId
         ? await ctx.db.get(participant.clusterId)
         : null;
+
+      // The real interview stage. This column used to be hardcoded to "intro"
+      // for every row, which also meant the stage filter matched everything.
+      const session = await ctx.db
+        .query("interview_sessions")
+        .withIndex("by_participant", (q) => q.eq("participantId", participant._id))
+        .first();
 
       return {
         _id: participant._id,
@@ -823,24 +903,44 @@ export const getConversations = query({
         lastMessageAt: lastMessage?._creationTime || participant._creationTime,
         messageCount: messages.length,
         unreadCount,
-        currentStage: "intro", // Default stage since it's not in the schema
+        currentStage: session?.step ?? "not_started",
         cluster: cluster ? { id: cluster._id, name: cluster.name } : null,
         consent: participant.consent,
       };
     });
 
     const conversations = await Promise.all(conversationsPromises);
-    
-    // Filter by stage if specified (using default stage for now)
+
     let filteredConversations = conversations;
     if (args.stage) {
       filteredConversations = conversations.filter(c => c.currentStage === args.stage);
     }
-    
+
     // Filter by unread status if specified
     if (args.hasUnread !== undefined) {
-      filteredConversations = filteredConversations.filter(c => 
+      filteredConversations = filteredConversations.filter(c =>
         args.hasUnread ? c.unreadCount > 0 : c.unreadCount === 0
+      );
+    }
+
+    if (args.startDate !== undefined) {
+      filteredConversations = filteredConversations.filter(
+        (c) => c.lastMessageAt >= args.startDate!,
+      );
+    }
+    if (args.endDate !== undefined) {
+      filteredConversations = filteredConversations.filter(
+        (c) => c.lastMessageAt <= args.endDate!,
+      );
+    }
+    if (args.minMessages !== undefined) {
+      filteredConversations = filteredConversations.filter(
+        (c) => c.messageCount >= args.minMessages!,
+      );
+    }
+    if (args.maxMessages !== undefined) {
+      filteredConversations = filteredConversations.filter(
+        (c) => c.messageCount <= args.maxMessages!,
       );
     }
 

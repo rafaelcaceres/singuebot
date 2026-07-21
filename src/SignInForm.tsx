@@ -2,26 +2,29 @@
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 export function SignInForm() {
   const { signIn } = useAuthActions();
   const [flow, setFlow] = useState<"signIn" | "signUp">("signIn");
   const [submitting, setSubmitting] = useState(false);
 
+  const isSignIn = flow === "signIn";
+
   return (
     <div className="w-full max-w-md mx-auto">
       <div className="text-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">
-          {flow === "signIn" ? "Welcome back" : "Create your account"}
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+          {isSignIn ? "Entrar no console" : "Criar sua conta"}
         </h1>
-        <p className="text-gray-600 mt-2">
-          {flow === "signIn" 
-            ? "Sign in to your account to continue" 
-            : "Sign up to get started with our platform"
-          }
+        <p className="text-muted-foreground mt-2 text-sm">
+          {isSignIn
+            ? "Acesse o painel para acompanhar as conversas e os disparos."
+            : "Crie uma conta para começar a usar o console."}
         </p>
       </div>
-      
+
       <form
         className="flex flex-col gap-4"
         onSubmit={(e) => {
@@ -31,90 +34,92 @@ export function SignInForm() {
           formData.set("flow", flow);
           void signIn("password", formData)
             .then(() => {
-              toast.success(
-                flow === "signIn" 
-                  ? "Successfully signed in!" 
-                  : "Account created successfully!"
-              );
+              toast.success(isSignIn ? "Sessão iniciada" : "Conta criada");
             })
             .catch((error) => {
-              let toastTitle = "";
+              // Named causes over a generic failure: "algo deu errado" gives the
+              // person nothing to act on.
+              let message: string;
               if (error.message.includes("Invalid password")) {
-                toastTitle = "Invalid password. Please try again.";
+                message = "Senha incorreta. Tente novamente.";
               } else if (error.message.includes("User already exists")) {
-                toastTitle = "An account with this email already exists. Try signing in instead.";
+                message = "Já existe uma conta com este email. Entre em vez de criar.";
               } else if (error.message.includes("User not found")) {
-                toastTitle = "No account found with this email. Try signing up instead.";
+                message = "Nenhuma conta encontrada com este email. Crie uma conta.";
               } else {
-                toastTitle =
-                  flow === "signIn"
-                    ? "Could not sign in. Please check your credentials."
-                    : "Could not create account. Please try again.";
+                message = isSignIn
+                  ? "Não foi possível entrar. Confira o email e a senha."
+                  : "Não foi possível criar a conta. Tente novamente.";
               }
-              toast.error(toastTitle);
+              toast.error(message);
               setSubmitting(false);
             });
         }}
       >
         <div>
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-            Email address
+          <label
+            htmlFor="email"
+            className="block text-sm font-medium text-foreground mb-1"
+          >
+            Email
           </label>
-          <input
+          <Input
             id="email"
-            className="auth-input-field w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             type="email"
             name="email"
-            placeholder="Enter your email"
+            autoComplete="email"
+            placeholder="voce@exemplo.com"
             required
           />
         </div>
-        
+
         <div>
-          <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-            Password
+          <label
+            htmlFor="password"
+            className="block text-sm font-medium text-foreground mb-1"
+          >
+            Senha
           </label>
-          <input
+          <Input
             id="password"
-            className="auth-input-field w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             type="password"
             name="password"
-            placeholder={flow === "signIn" ? "Enter your password" : "Create a password"}
+            autoComplete={isSignIn ? "current-password" : "new-password"}
+            placeholder={isSignIn ? "Sua senha" : "Crie uma senha"}
             required
-            minLength={flow === "signUp" ? 8 : undefined}
+            minLength={isSignIn ? undefined : 8}
+            aria-describedby={isSignIn ? undefined : "password-hint"}
           />
-          {flow === "signUp" && (
-            <p className="text-xs text-gray-500 mt-1">
-              Password must be at least 8 characters long
+          {!isSignIn && (
+            <p id="password-hint" className="text-xs text-muted-foreground mt-1">
+              Mínimo de 8 caracteres.
             </p>
           )}
         </div>
-        
-        <button 
-          className="auth-button w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors" 
-          type="submit" 
-          disabled={submitting}
-        >
-          {submitting 
-            ? (flow === "signIn" ? "Signing in..." : "Creating account...") 
-            : (flow === "signIn" ? "Sign in" : "Create account")
-          }
-        </button>
+
+        <Button type="submit" className="w-full" disabled={submitting}>
+          {submitting
+            ? isSignIn
+              ? "Entrando..."
+              : "Criando conta..."
+            : isSignIn
+              ? "Entrar"
+              : "Criar conta"}
+        </Button>
       </form>
-      
+
       <div className="text-center mt-6">
-        <span className="text-sm text-gray-600">
-          {flow === "signIn"
-            ? "Don't have an account? "
-            : "Already have an account? "}
+        <span className="text-sm text-muted-foreground">
+          {isSignIn ? "Ainda não tem conta? " : "Já tem uma conta? "}
         </span>
-        <button
+        <Button
           type="button"
-          className="text-sm text-blue-600 hover:text-blue-700 hover:underline font-medium cursor-pointer"
-          onClick={() => setFlow(flow === "signIn" ? "signUp" : "signIn")}
+          variant="link"
+          className="h-auto p-0 text-sm font-medium"
+          onClick={() => setFlow(isSignIn ? "signUp" : "signIn")}
         >
-          {flow === "signIn" ? "Sign up" : "Sign in"}
-        </button>
+          {isSignIn ? "Criar conta" : "Entrar"}
+        </Button>
       </div>
     </div>
   );

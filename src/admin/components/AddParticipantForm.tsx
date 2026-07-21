@@ -25,7 +25,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Plus, X } from 'lucide-react';
-import { toast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
 // Schema de validação
 const participantSchema = z.object({
@@ -120,8 +120,7 @@ export const AddParticipantForm: React.FC<AddParticipantFormProps> = ({
         tags: tags,
       });
 
-      toast({
-        title: 'Participante criado com sucesso!',
+      toast.success('Participante criado com sucesso!', {
         description: `${data.name} foi adicionado à lista de participantes.`,
       });
 
@@ -136,11 +135,7 @@ export const AddParticipantForm: React.FC<AddParticipantFormProps> = ({
     } catch (error) {
       console.error('Erro ao criar participante:', error);
 
-      toast({
-        title: 'Erro ao criar participante',
-        description: error instanceof Error ? error.message : 'Ocorreu um erro inesperado.',
-        variant: 'destructive',
-      });
+      toast.error('Erro ao criar participante');
     }
   };
 

@@ -2,6 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { Id } from '../../../convex/_generated/dataModel';
+import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 interface TemplateConfigModalProps {
   isOpen: boolean;
@@ -57,8 +66,9 @@ export const TemplateConfigModal: React.FC<TemplateConfigModalProps> = ({
       });
       onClose();
     } catch (error) {
-      console.error('Failed to configure template:', error);
-      alert('Failed to configure template. Please try again.');
+      toast.error('Não foi possível salvar a configuração do template', {
+        description: error instanceof Error ? error.message : 'Tente novamente.',
+      });
     }
   };
 
@@ -93,47 +103,39 @@ export const TemplateConfigModal: React.FC<TemplateConfigModalProps> = ({
     }));
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold">
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-4xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-2xl">
             {templateId ? 'Edit Template Configuration' : 'Create Template Configuration'}
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 text-2xl"
-          >
-            ×
-          </button>
-        </div>
+          </DialogTitle>
+        </DialogHeader>
 
         <form onSubmit={(e) => { void handleSubmit(e); }} className="space-y-6">
           {/* Basic Template Info */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-foreground mb-2">
                 Template Name
               </label>
               <input
                 type="text"
                 value={formData.name}
                 onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-input bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-foreground mb-2">
                 Twilio Template ID
               </label>
               <input
                 type="text"
                 value={formData.twilioId}
                 onChange={(e) => setFormData(prev => ({ ...prev, twilioId: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-input bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
                 placeholder="HX..."
                 required
               />
@@ -142,13 +144,13 @@ export const TemplateConfigModal: React.FC<TemplateConfigModalProps> = ({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-foreground mb-2">
                 Locale
               </label>
               <select
                 value={formData.locale}
                 onChange={(e) => setFormData(prev => ({ ...prev, locale: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-input bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 <option value="pt-BR">Portuguese (Brazil)</option>
                 <option value="en-US">English (US)</option>
@@ -156,13 +158,13 @@ export const TemplateConfigModal: React.FC<TemplateConfigModalProps> = ({
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-foreground mb-2">
                 Stage
               </label>
               <select
                 value={formData.stage}
                 onChange={(e) => setFormData(prev => ({ ...prev, stage: e.target.value as 'draft' | 'submitted' | 'approved' | 'rejected' }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-input bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
                 required
               >
                 <option value="draft">Draft</option>
@@ -177,40 +179,36 @@ export const TemplateConfigModal: React.FC<TemplateConfigModalProps> = ({
           <div>
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold">Variable Mappings</h3>
-              <button
-                type="button"
-                onClick={addVariableMapping}
-                className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
-              >
+              <Button type="button" onClick={addVariableMapping}>
                 Add Mapping
-              </button>
+              </Button>
             </div>
 
             <div className="space-y-4">
               {formData.variableMappings.map((mapping, index) => (
-                <div key={index} className="border border-gray-200 rounded-lg p-4">
+                <div key={index} className="border border-border rounded-lg p-4">
                   <div className="grid grid-cols-4 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-foreground mb-1">
                         Template Variable
                       </label>
                       <input
                         type="text"
                         value={mapping.templateVariable}
                         onChange={(e) => updateVariableMapping(index, 'templateVariable', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 border border-input bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
                         placeholder="nome, telefone, etc."
                         required
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-foreground mb-1">
                         Participant Field
                       </label>
                       <select
                         value={mapping.participantField}
                         onChange={(e) => updateVariableMapping(index, 'participantField', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 border border-input bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
                       >
                         {participantFields?.map((field) => (
                           <option key={field.key} value={field.key}>
@@ -220,14 +218,14 @@ export const TemplateConfigModal: React.FC<TemplateConfigModalProps> = ({
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-foreground mb-1">
                         Default Value
                       </label>
                       <input
                         type="text"
                         value={mapping.defaultValue || ''}
                         onChange={(e) => updateVariableMapping(index, 'defaultValue', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 border border-input bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
                         placeholder="Optional default"
                       />
                     </div>
@@ -241,13 +239,15 @@ export const TemplateConfigModal: React.FC<TemplateConfigModalProps> = ({
                         />
                         Required
                       </label>
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="sm"
                         onClick={() => removeVariableMapping(index)}
-                        className="text-red-500 hover:text-red-700"
+                        className="text-destructive hover:text-destructive"
                       >
                         Remove
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -255,30 +255,23 @@ export const TemplateConfigModal: React.FC<TemplateConfigModalProps> = ({
             </div>
 
             {formData.variableMappings.length === 0 && (
-              <div className="text-center py-8 text-gray-500">
+              <div className="text-center py-8 text-muted-foreground">
                 No variable mappings configured. Click "Add Mapping" to start.
               </div>
             )}
           </div>
 
           {/* Action Buttons */}
-          <div className="flex justify-end space-x-4 pt-6 border-t">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
-            >
+          <DialogFooter className="flex gap-2 pt-6 border-t">
+            <Button type="button" variant="outline" onClick={onClose}>
               Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-6 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
-            >
+            </Button>
+            <Button type="submit">
               {templateId ? 'Update Template' : 'Create Template'}
-            </button>
-          </div>
+            </Button>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };

@@ -1,6 +1,8 @@
 import React from 'react';
 import { Id } from '../../../../convex/_generated/dataModel';
 import { ConversationListItem } from './ConversationListItem';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 type FilterType = 'all' | 'active' | 'needs_attention' | 'unread';
 
@@ -50,29 +52,29 @@ export const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
   isLoading,
 }) => {
   return (
-    <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
+    <div className="w-80 bg-card border-r border-border flex flex-col">
       {/* Filters */}
-      <div className="p-4 border-b border-gray-200">
+      <div className="p-4 border-b border-border">
         <div className="flex flex-wrap gap-2 mb-3">
           {filterOptions.map((option) => (
-            <button
+            <Button
               key={option.value}
               onClick={() => onFilterChange(option.value)}
-              className={`px-3 py-1.5 text-sm rounded-full transition-colors ${
-                filter === option.value
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
+              variant={filter === option.value ? 'default' : 'secondary'}
+              size="sm"
+              aria-pressed={filter === option.value}
+              className="rounded-full"
             >
               {option.label}
-            </button>
+            </Button>
           ))}
         </div>
 
         {/* Search */}
         <div className="relative">
           <svg
-            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
+            aria-hidden="true"
+            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -84,12 +86,13 @@ export const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
               d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
             />
           </svg>
-          <input
+          <Input
             type="text"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Buscar por nome ou telefone..."
-            className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            aria-label="Buscar por nome ou telefone"
+            className="pl-10 focus-visible:ring-2"
           />
         </div>
       </div>
@@ -101,21 +104,21 @@ export const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
             {[...Array(5)].map((_, i) => (
               <div key={i} className="animate-pulse">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gray-200 rounded-full" />
+                  <div className="w-10 h-10 bg-muted rounded-full" />
                   <div className="flex-1">
-                    <div className="h-4 bg-gray-200 rounded w-24 mb-2" />
-                    <div className="h-3 bg-gray-200 rounded w-32" />
+                    <div className="h-4 bg-muted rounded w-24 mb-2" />
+                    <div className="h-3 bg-muted rounded w-32" />
                   </div>
                 </div>
               </div>
             ))}
           </div>
         ) : conversations.length === 0 ? (
-          <div className="p-4 text-center text-gray-500">
+          <div className="p-4 text-center text-muted-foreground">
             <p className="text-sm">Nenhuma conversa encontrada</p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-border">
             {conversations.map((conversation) => (
               <ConversationListItem
                 key={conversation.participantId}
@@ -129,8 +132,8 @@ export const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
       </div>
 
       {/* Footer with count */}
-      <div className="p-3 border-t border-gray-200 bg-gray-50">
-        <p className="text-xs text-gray-500 text-center">
+      <div className="p-3 border-t border-border bg-muted">
+        <p className="text-xs text-muted-foreground text-center">
           {conversations.length} conversa{conversations.length !== 1 ? 's' : ''}
         </p>
       </div>

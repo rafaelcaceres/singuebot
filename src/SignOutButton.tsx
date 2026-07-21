@@ -35,11 +35,19 @@ export function SignOutButton() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+        <Button
+          variant="ghost"
+          className="relative h-10 w-10 rounded-full"
+          aria-label="Abrir menu da conta"
+        >
           <Avatar className="h-10 w-10">
-            <AvatarImage src="" alt={user.email || "User"} />
+            <AvatarImage src="" alt="" />
             <AvatarFallback className="bg-primary text-primary-foreground">
-              {user.email ? getInitials(user.email) : <User className="h-4 w-4" />}
+              {user.email ? (
+                getInitials(user.email)
+              ) : (
+                <User className="h-4 w-4" aria-hidden="true" />
+              )}
             </AvatarFallback>
           </Avatar>
         </Button>
@@ -57,10 +65,10 @@ export function SignOutButton() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem
-          className="cursor-pointer text-red-600 focus:text-red-600"
+          className="cursor-pointer text-destructive focus:text-destructive"
           onClick={() => void signOut()}
         >
-          <LogOut className="mr-2 h-4 w-4" />
+          <LogOut className="mr-2 h-4 w-4" aria-hidden="true" />
           <span>Sair</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
