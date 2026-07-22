@@ -1052,6 +1052,47 @@ export const getFailureSummary = query({
   },
 });
 
+/**
+ * Skip breakdown grouped by skipReason, for the detail page. Mirrors
+ * getFailureSummary: a skipped number never reached Twilio (deduped, invalid,
+ * or outside the test allowlist), so the operator needs to see WHY a number
+ * they expected to reach was dropped. Phones are included per reason (capped)
+ * so the operator can find a specific number. Counts beyond the scan cap are
+ * still reflected in the broadcast's skippedCount total on the page.
+ */
+export const getSkippedSummary = query({
+  args: { broadcastId: v.id("broadcasts") },
+  returns: v.array(
+    v.object({
+      skipReason: v.string(),
+      count: v.number(),
+      phones: v.array(v.string()),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    const skipped = await ctx.db
+      .query("broadcastRecipients")
+      .withIndex("by_broadcast_status", (q) =>
+        q.eq("broadcastId", args.broadcastId).eq("status", "skipped"),
+      )
+      .take(5000);
+
+    const groups = new Map<string, { skipReason: string; count: number; phones: string[] }>();
+    for (const recipient of skipped) {
+      const key = recipient.skipReason ?? "unknown";
+      const existing = groups.get(key);
+      if (existing) {
+        existing.count += 1;
+        if (existing.phones.length < 500) existing.phones.push(recipient.phone);
+      } else {
+        groups.set(key, { skipReason: key, count: 1, phones: [recipient.phone] });
+      }
+    }
+
+    return [...groups.values()].sort((a, b) => b.count - a.count);
+  },
+});
+
 /** Used by the status webhook to map a Twilio MessageSid back to a recipient. */
 export const updateRecipientByMessageSid = internalMutation({
   args: {

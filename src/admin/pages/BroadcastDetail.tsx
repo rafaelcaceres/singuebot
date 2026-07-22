@@ -12,7 +12,8 @@ import { StatusBadge } from '@/components/ui/status-badge';
 const SKIP_LABELS: Record<string, string> = {
   invalid_phone: 'Telefone inválido',
   duplicate_phone: 'Telefone duplicado na seleção',
-  not_in_allowlist: 'Fora da lista de teste',
+  not_in_allowlist: 'Fora da lista de teste (TWILIO_TEST_ALLOWLIST)',
+  unknown: 'Motivo não registrado',
 };
 
 export const BroadcastDetail: React.FC = () => {
@@ -25,6 +26,7 @@ export const BroadcastDetail: React.FC = () => {
   // is correct again on reload — the send does not live in the browser.
   const broadcast = useQuery(api.functions.broadcasts.getBroadcast, { broadcastId });
   const failures = useQuery(api.functions.broadcasts.getFailureSummary, { broadcastId });
+  const skipped = useQuery(api.functions.broadcasts.getSkippedSummary, { broadcastId });
 
   const pause = useMutation(api.functions.broadcasts.pauseBroadcast);
   const resume = useMutation(api.functions.broadcasts.resumeBroadcast);
@@ -183,10 +185,46 @@ export const BroadcastDetail: React.FC = () => {
         </div>
       )}
 
-      {broadcast.skippedCount > 0 && (
-        <p className="mt-4 text-xs text-muted-foreground">
-          Pulados não são enviados: {Object.values(SKIP_LABELS).join(' · ')}.
-        </p>
+      {/* Skipped, grouped by reason — a skipped number never reached Twilio.
+          Shows WHY each number was dropped, plus the numbers, so an operator
+          can find a specific one they expected to reach. */}
+      {skipped && skipped.length > 0 && (
+        <div className="mt-6 rounded-lg border border-border bg-card shadow-sm">
+          <div className="border-b border-border px-6 py-3">
+            <h2 className="text-sm font-medium text-foreground">Pulados por motivo</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Estes números não foram enviados.
+            </p>
+          </div>
+          <ul className="divide-y divide-border">
+            {skipped.map((group) => (
+              <li key={group.skipReason} className="px-6 py-3">
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="text-sm text-foreground">
+                    {SKIP_LABELS[group.skipReason] ?? group.skipReason}
+                  </p>
+                  <span className="shrink-0 text-sm font-semibold text-foreground">
+                    {group.count}
+                  </span>
+                </div>
+                {group.phones.length > 0 && (
+                  <div className="mt-2 max-h-40 overflow-auto rounded-md bg-muted p-2">
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 font-mono text-xs text-muted-foreground">
+                      {group.phones.map((phone) => (
+                        <span key={phone}>{phone}</span>
+                      ))}
+                    </div>
+                    {group.count > group.phones.length && (
+                      <p className="mt-1.5 text-xs text-muted-foreground">
+                        … e mais {group.count - group.phones.length}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   );
