@@ -964,6 +964,26 @@ export const getClusters = query({
   },
 });
 
+export const getImportSources = query({
+  args: {},
+  handler: async (ctx) => {
+    const participants = await ctx.db.query("participants").collect();
+
+    const counts = new Map<string, number>();
+    for (const participant of participants) {
+      if (!participant.importSource) continue;
+      counts.set(
+        participant.importSource,
+        (counts.get(participant.importSource) ?? 0) + 1
+      );
+    }
+
+    return Array.from(counts.entries())
+      .map(([importSource, count]) => ({ importSource, count }))
+      .sort((a, b) => b.count - a.count);
+  },
+});
+
 // Knowledge Management Functions
 
 export const getKnowledgeDocuments = query({

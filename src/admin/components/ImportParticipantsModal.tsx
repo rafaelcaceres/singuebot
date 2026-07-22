@@ -83,6 +83,66 @@ interface ImportParticipantsModalProps {
   onSuccess?: () => void;
 }
 
+interface TemplateColumn {
+  header: string;
+  example: string;
+}
+
+// Headers use only the short, canonical labels the parser above recognizes
+// (see headerMap) — anything more descriptive would silently fail to map.
+const REQUIRED_TEMPLATE_COLUMNS: TemplateColumn[] = [
+  { header: 'Nome', example: 'Maria Silva' },
+  { header: 'Telefone', example: '+55 11 91234-5678' },
+];
+
+const FULL_TEMPLATE_COLUMNS: TemplateColumn[] = [
+  ...REQUIRED_TEMPLATE_COLUMNS,
+  { header: 'ID', example: '10432' },
+  { header: 'Email', example: 'maria.silva@empresa.com' },
+  { header: 'Cargo', example: 'Gerente de Operações' },
+  { header: 'Empresa', example: 'Empresa Exemplo Ltda' },
+  { header: 'Setor', example: 'Financeiro' },
+  { header: 'Estado', example: 'SP' },
+  { header: 'Raça', example: 'Preta' },
+  { header: 'Gênero', example: 'Mulher cisgênero' },
+  { header: 'Anos de carreira', example: '8' },
+  { header: 'Senioridade', example: 'Sênior' },
+  { header: 'LinkedIn', example: 'https://linkedin.com/in/mariasilva' },
+  { header: 'Tipo de organização', example: 'Privada' },
+  { header: 'Programa', example: 'FIB' },
+  { header: 'Receita anual', example: 'R$ 10-50 milhões' },
+  { header: 'Transgênero', example: 'Não' },
+  { header: 'País', example: 'Brasil' },
+  { header: 'Portfólio', example: 'https://mariasilva.com' },
+  { header: 'Black Sister in Law', example: 'Não' },
+  { header: 'Mercado financeiro', example: 'Sim' },
+  { header: 'Membro de conselho', example: 'Não' },
+  { header: 'Programas Pactuá', example: '' },
+  { header: 'Programas Singuê', example: 'Fellowship 2025' },
+  { header: 'Realizações', example: 'Liderou a expansão da área para 3 novos estados.' },
+  { header: 'Visão de futuro', example: 'Se tornar diretora de operações em 5 anos.' },
+  { header: 'Desafios superados', example: 'Migrar de carreira para a área de tecnologia.' },
+  { header: 'Desafios atuais', example: 'Conseguir mais visibilidade para promoção.' },
+  { header: 'Motivação', example: 'Ampliar a rede de contatos e mentoria.' },
+];
+
+const downloadCSVTemplate = (columns: TemplateColumn[], filename: string) => {
+  const csvContent = [columns.map((c) => c.header), columns.map((c) => c.example)]
+    .map((row) => row.map((field) => `"${field.replace(/"/g, '""')}"`).join(','))
+    .join('\n');
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  link.setAttribute('href', url);
+  link.setAttribute('download', filename);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
 export const ImportParticipantsModal: React.FC<ImportParticipantsModalProps> = ({
   open,
   onOpenChange,
@@ -169,6 +229,8 @@ export const ImportParticipantsModal: React.FC<ImportParticipantsModalProps> = (
       'qual seu cargo atualmente?': 'cargo',
       'cargo': 'cargo',
       'position': 'cargo',
+      'empresa': 'empresa',
+      'company': 'empresa',
       // IMPORTANT: This is column 23 (index 22) - free text company name
       // NOT to be confused with column 26 which has "Realização de Impacto"
       'setor principal de atuação:': 'setor',
@@ -249,14 +311,17 @@ export const ImportParticipantsModal: React.FC<ImportParticipantsModalProps> = (
         // Values are already properly parsed, just trim whitespace
         const value = values[index] ? values[index].trim() : '';
 
-        // Special handling: Column 23 (index 22) is the free-text empresa field
-        if (index === 22 && value) {
+        // Special handling: Column 23 (index 22) is the free-text empresa field.
+        // Only fires when the header itself isn't recognized (the legacy survey
+        // export has an ambiguous header there) — a properly-labeled column,
+        // like the one in our own downloadable template, is never overridden.
+        if (index === 22 && value && !mappedKey) {
           row.empresa = value;
           return;
         }
 
-        // Special handling: Column 24 (index 23) is the portfolio URL
-        if (index === 23 && value) {
+        // Special handling: Column 24 (index 23) is the portfolio URL (same caveat).
+        if (index === 23 && value && !mappedKey) {
           row.portfolioUrl = value;
           return;
         }
@@ -446,6 +511,32 @@ export const ImportParticipantsModal: React.FC<ImportParticipantsModalProps> = (
         </DialogHeader>
 
         <div className="space-y-6">
+          {/* Downloadable templates */}
+          {csvData.length === 0 && (
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  downloadCSVTemplate(REQUIRED_TEMPLATE_COLUMNS, 'modelo_participantes_obrigatorios.csv')
+                }
+              >
+                <Download className="h-4 w-4 mr-2" aria-hidden="true" />
+                Modelo (campos obrigatórios)
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  downloadCSVTemplate(FULL_TEMPLATE_COLUMNS, 'modelo_participantes_completo.csv')
+                }
+              >
+                <Download className="h-4 w-4 mr-2" aria-hidden="true" />
+                Modelo (todos os campos)
+              </Button>
+            </div>
+          )}
+
           {/* File Upload Area */}
           {csvData.length === 0 && (
             <div

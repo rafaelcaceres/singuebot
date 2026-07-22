@@ -68,6 +68,7 @@ export const Participants: React.FC = () => {
   // Filters state
   const [clusterFilter, setClusterFilter] = useState<string>('');
   const [stageFilter, setStageFilter] = useState<string>('');
+  const [importSourceFilter, setImportSourceFilter] = useState<string>('');
 
   // Fetch data
   const participantsData = useQuery(api.admin.getParticipants, {
@@ -75,9 +76,11 @@ export const Participants: React.FC = () => {
     offset: pagination.pageIndex * pagination.pageSize,
     clusterId: (clusterFilter || undefined) as any,
     stage: stageFilter || undefined,
+    importSource: importSourceFilter || undefined,
   });
 
   const clusters = useQuery(api.admin.getClusters);
+  const importSources = useQuery(api.admin.getImportSources);
 
   // Mutations
   const deleteParticipantMutation = useMutation(api.admin.deleteParticipant);
@@ -438,6 +441,25 @@ export const Participants: React.FC = () => {
                 <option value="expectativas_evento">Expectativas do Evento</option>
                 <option value="objetivo_principal">Objetivo Principal</option>
                 <option value="finalizacao">Finalização</option>
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="participants-import-source" className="block text-sm font-medium text-foreground mb-1">
+              Origem da importação
+            </label>
+            <select
+              id="participants-import-source"
+              value={importSourceFilter}
+              onChange={(e) => setImportSourceFilter(e.target.value)}
+              className="w-full px-3 py-2 bg-background text-foreground border border-input rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <option value="">Todas as importações</option>
+              {importSources?.map((source) => (
+                <option key={source.importSource} value={source.importSource}>
+                  {source.importSource} ({source.count})
+                </option>
+              ))}
             </select>
           </div>
 
