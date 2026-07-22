@@ -74,8 +74,44 @@ interface ImportResult {
     identifierValue: string;
     existingId: string;
     email?: string;
+    fieldsFilled: string[];
   }>;
 }
+
+// Maps backend field keys to the labels shown for "campos preenchidos".
+const FIELD_LABELS: Record<string, string> = {
+  name: 'nome',
+  clusterId: 'cluster',
+  externalId: 'ID externo',
+  importSource: 'origem da importação',
+  cargo: 'cargo',
+  empresa: 'empresa',
+  empresaPrograma: 'empresa (dropdown)',
+  setor: 'setor',
+  email: 'email',
+  estado: 'estado',
+  raca: 'raça',
+  genero: 'gênero',
+  annosCarreira: 'anos de carreira',
+  senioridade: 'senioridade',
+  linkedin: 'linkedin',
+  tipoOrganizacao: 'tipo de organização',
+  programaMarca: 'programa',
+  receitaAnual: 'receita anual',
+  transgenero: 'transgênero',
+  pais: 'país',
+  portfolioUrl: 'portfólio',
+  blackSisterInLaw: 'black sister in law',
+  mercadoFinanceiro: 'mercado financeiro',
+  membroConselho: 'membro de conselho',
+  programasPactua: 'programas Pactuá',
+  programasSingue: 'programas Singuê',
+  realizacoes: 'realizações',
+  visaoFuturo: 'visão de futuro',
+  desafiosSuperados: 'desafios superados',
+  desafiosAtuais: 'desafios atuais',
+  motivacao: 'motivação',
+};
 
 interface ImportParticipantsModalProps {
   open: boolean;
@@ -463,7 +499,13 @@ export const ImportParticipantsModal: React.FC<ImportParticipantsModalProps> = (
       ]),
       ...importResult.duplicates.map(duplicate => [
         duplicate.row.toString(),
-        `Participante já existe (${duplicate.identifierType}: ${duplicate.identifierValue})`,
+        `Participante já existia (${duplicate.identifierType}: ${duplicate.identifierValue}) — ${
+          duplicate.fieldsFilled.length > 0
+            ? `campos preenchidos: ${duplicate.fieldsFilled
+                .map((field) => FIELD_LABELS[field] ?? field)
+                .join(', ')}`
+            : 'nenhum campo novo'
+        }`,
         duplicate.email || '',
       ]),
     ];
@@ -507,6 +549,8 @@ export const ImportParticipantsModal: React.FC<ImportParticipantsModalProps> = (
           <DialogDescription>
             Faça upload de um arquivo CSV para importar participantes em lote.
             Colunas obrigatórias: Nome e Telefone. Campos opcionais: Email, Cargo, Empresa, Setor, Estado, Programa, e outros dados demográficos e profissionais.
+            Se o telefone (ou email) já existir, o participante não é duplicado — os campos que
+            ainda estiverem vazios são preenchidos com os dados da planilha.
           </DialogDescription>
         </DialogHeader>
 
@@ -710,10 +754,10 @@ export const ImportParticipantsModal: React.FC<ImportParticipantsModalProps> = (
                   <div className="text-sm">Importados</div>
                 </div>
 
-                <div className="text-center p-4 bg-warning-muted text-warning-muted-foreground rounded-lg">
+                <div className="text-center p-4 bg-info-muted text-info-muted-foreground rounded-lg">
                   <AlertCircle className="h-8 w-8 mx-auto mb-2" aria-hidden="true" />
                   <div className="text-2xl font-bold">{importResult.duplicates.length}</div>
-                  <div className="text-sm">Duplicados</div>
+                  <div className="text-sm">Já existentes (atualizados)</div>
                 </div>
 
                 <div className="text-center p-4 bg-destructive-muted text-destructive-muted-foreground rounded-lg">
@@ -749,7 +793,27 @@ export const ImportParticipantsModal: React.FC<ImportParticipantsModalProps> = (
                         
                         {importResult.duplicates.length > 0 && (
                           <div className="mt-4">
-                            <strong>{importResult.duplicates.length} participantes já existem</strong>
+                            <strong>
+                              {importResult.duplicates.length} participantes já existiam — campos
+                              vazios foram preenchidos com os dados da planilha
+                            </strong>
+                            <ul className="mt-2 space-y-1">
+                              {importResult.duplicates.slice(0, 3).map((duplicate, index) => (
+                                <li key={index} className="text-sm">
+                                  Linha {duplicate.row}:{' '}
+                                  {duplicate.fieldsFilled.length > 0
+                                    ? `preenchido(s) ${duplicate.fieldsFilled
+                                        .map((field) => FIELD_LABELS[field] ?? field)
+                                        .join(', ')}`
+                                    : 'nenhum campo novo (já estava completo)'}
+                                </li>
+                              ))}
+                              {importResult.duplicates.length > 3 && (
+                                <li className="text-sm">
+                                  ... e mais {importResult.duplicates.length - 3}
+                                </li>
+                              )}
+                            </ul>
                           </div>
                         )}
                       </div>

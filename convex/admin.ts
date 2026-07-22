@@ -3,6 +3,7 @@ import { query, mutation, action, internalMutation, internalAction, internalQuer
 import { api, internal } from "./_generated/api";
 import { rag } from "./functions/rag";
 import type { EntryId } from "@convex-dev/rag";
+import { normalizePhoneNumber } from "./utils/phoneNormalizer";
 
 // Helper function to get or create conversation for participant
 const getOrCreateConversation = async (ctx: any, participantId: any) => {
@@ -503,28 +504,6 @@ export const deleteParticipant = mutation({
   },
 });
 
-// Helper function to normalize phone numbers
-const normalizePhoneNumber = (phone: string): string | null => {
-  // Remove all non-digit characters
-  const digits = phone.replace(/\D/g, '');
-  
-  // Handle Brazilian numbers
-  if (digits.length === 11 && digits.startsWith('55')) {
-    return `whatsapp:+${digits}`;
-  }
-  
-  // Handle numbers with country code
-  if (digits.length >= 10 && digits.length <= 15) {
-    // If doesn't start with country code, assume Brazil (+55)
-    if (digits.length === 10 || digits.length === 11) {
-      return `whatsapp:+55${digits}`;
-    }
-    return `whatsapp:+${digits}`;
-  }
-  
-  return null;
-};
-
 export const importParticipantsFromCSV = mutation({
   args: {
     csvData: v.array(v.object({
@@ -576,6 +555,7 @@ export const importParticipantsFromCSV = mutation({
         identifierValue: string;
         existingId: string;
         email?: string;
+        fieldsFilled: string[];
       }>,
     };
 
@@ -595,10 +575,13 @@ export const importParticipantsFromCSV = mutation({
           continue;
         }
 
-        // Normalize phone number
+        // Normalize phone number (same Brazilian-aware normalizer used for
+        // incoming WhatsApp messages, so a CSV phone in any format matches an
+        // existing participant instead of silently creating a duplicate).
         const normalizedPhone = normalizePhoneNumber(trimmedPhone || row.telefone);
+        const phoneDigitCount = normalizedPhone.replace(/\D/g, "").length;
 
-        if (!normalizedPhone) {
+        if (phoneDigitCount < 10 || phoneDigitCount > 15) {
           results.errors.push({
             row: rowNumber,
             error: "Número de telefone inválido",
@@ -648,12 +631,107 @@ export const importParticipantsFromCSV = mutation({
         }
 
         if (existingParticipant) {
+          // Don't skip: an existing record just means the person filled the
+          // form more than once. Backfill whatever fields it's still missing
+          // instead of discarding the new submission's data — never overwrite
+          // a value that's already there.
+          const participantPatch: Record<string, any> = {};
+          const fieldsFilled: string[] = [];
+          const fillIfEmpty = (key: string, newValue: unknown) => {
+            const current = (existingParticipant as any)[key];
+            const isEmpty = current === undefined || current === null || current === "";
+            const hasNewValue =
+              newValue !== undefined && newValue !== null && newValue !== "";
+            if (isEmpty && hasNewValue) {
+              participantPatch[key] = newValue;
+              fieldsFilled.push(key);
+            }
+          };
+
+          fillIfEmpty("name", row.nome?.trim());
+          fillIfEmpty("clusterId", args.clusterId);
+          fillIfEmpty("externalId", row.externalId?.trim());
+          fillIfEmpty("importSource", args.importSource?.trim());
+          fillIfEmpty("cargo", row.cargo?.trim());
+          fillIfEmpty("empresa", row.empresa?.trim());
+          fillIfEmpty("empresaPrograma", row.empresaPrograma?.trim());
+          fillIfEmpty("setor", row.setor?.trim());
+          fillIfEmpty("email", normalizedEmail || trimmedEmail);
+          fillIfEmpty("estado", row.estado?.trim());
+          fillIfEmpty("raca", row.raca?.trim());
+          fillIfEmpty("genero", row.genero?.trim());
+          fillIfEmpty("annosCarreira", row.annosCarreira?.trim());
+          fillIfEmpty("senioridade", row.senioridade?.trim());
+          fillIfEmpty("linkedin", row.linkedin?.trim());
+          fillIfEmpty("tipoOrganizacao", row.tipoOrganizacao?.trim());
+          fillIfEmpty("programaMarca", row.programaMarca?.trim());
+          fillIfEmpty("receitaAnual", row.receitaAnual?.trim());
+          fillIfEmpty("transgenero", row.transgenero);
+          fillIfEmpty("pais", row.pais?.trim());
+          fillIfEmpty("portfolioUrl", row.portfolioUrl?.trim());
+          fillIfEmpty("blackSisterInLaw", row.blackSisterInLaw);
+          fillIfEmpty("mercadoFinanceiro", row.mercadoFinanceiro);
+          fillIfEmpty("membroConselho", row.membroConselho);
+          fillIfEmpty("programasPactua", row.programasPactua?.trim());
+          fillIfEmpty("programasSingue", row.programasSingue?.trim());
+
+          if (Object.keys(participantPatch).length > 0) {
+            await ctx.db.patch(existingParticipant._id, participantPatch);
+          }
+
+          if (row.realizacoes || row.visaoFuturo || row.desafiosSuperados ||
+              row.desafiosAtuais || row.motivacao) {
+            const existingProfile = await ctx.db
+              .query("participant_profiles")
+              .withIndex("by_participant", (q) => q.eq("participantId", existingParticipant._id))
+              .first();
+
+            if (existingProfile) {
+              const profilePatch: Record<string, any> = {};
+              const fillProfileIfEmpty = (key: string, newValue: unknown) => {
+                const current = (existingProfile as any)[key];
+                const isEmpty = current === undefined || current === null || current === "";
+                const hasNewValue =
+                  newValue !== undefined && newValue !== null && newValue !== "";
+                if (isEmpty && hasNewValue) {
+                  profilePatch[key] = newValue;
+                  fieldsFilled.push(key);
+                }
+              };
+
+              fillProfileIfEmpty("realizacoes", row.realizacoes?.trim());
+              fillProfileIfEmpty("visaoFuturo", row.visaoFuturo?.trim());
+              fillProfileIfEmpty("desafiosSuperados", row.desafiosSuperados?.trim());
+              fillProfileIfEmpty("desafiosAtuais", row.desafiosAtuais?.trim());
+              fillProfileIfEmpty("motivacao", row.motivacao?.trim());
+
+              if (Object.keys(profilePatch).length > 0) {
+                await ctx.db.patch(existingProfile._id, profilePatch);
+              }
+            } else {
+              await ctx.db.insert("participant_profiles", {
+                participantId: existingParticipant._id,
+                realizacoes: row.realizacoes?.trim() || undefined,
+                visaoFuturo: row.visaoFuturo?.trim() || undefined,
+                desafiosSuperados: row.desafiosSuperados?.trim() || undefined,
+                desafiosAtuais: row.desafiosAtuais?.trim() || undefined,
+                motivacao: row.motivacao?.trim() || undefined,
+              });
+              if (row.realizacoes?.trim()) fieldsFilled.push("realizacoes");
+              if (row.visaoFuturo?.trim()) fieldsFilled.push("visaoFuturo");
+              if (row.desafiosSuperados?.trim()) fieldsFilled.push("desafiosSuperados");
+              if (row.desafiosAtuais?.trim()) fieldsFilled.push("desafiosAtuais");
+              if (row.motivacao?.trim()) fieldsFilled.push("motivacao");
+            }
+          }
+
           results.duplicates.push({
             row: rowNumber,
             identifierType: duplicateField || "phone",
             identifierValue: duplicateValue || trimmedPhone || row.telefone,
             existingId: existingParticipant._id,
             email: normalizedEmail || trimmedEmail || undefined,
+            fieldsFilled,
           });
           continue;
         }
