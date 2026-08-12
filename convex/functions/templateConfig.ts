@@ -6,6 +6,7 @@ import {
   extractBodyTokens,
   resolveTemplateVariables,
 } from "./templateVariables";
+import { requireOrganizer } from "../lib/requireOrganizer";
 
 /**
  * Template Configuration Functions
@@ -31,6 +32,7 @@ export const configureTemplate = mutation({
   },
   returns: v.id("templates"),
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "editor");
     const existing = args.templateId ? await ctx.db.get(args.templateId) : null;
 
     // The variable list belongs to the Twilio sync, not to this form. This mutation
@@ -203,6 +205,7 @@ export const archiveMissingTemplates = internalMutation({
 export const getTemplateConfig = query({
   args: { templateId: v.id("templates") },
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "editor");
     return await ctx.db.get(args.templateId);
   },
 });
@@ -213,6 +216,7 @@ export const getTemplateConfig = query({
 export const getTemplateConfigByName = query({
   args: { templateName: v.string() },
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "editor");
     return await ctx.db
       .query("templates")
       .withIndex("by_name", (q) => q.eq("name", args.templateName))
@@ -226,6 +230,7 @@ export const getTemplateConfigByName = query({
 export const listTemplates = query({
   args: {},
   handler: async (ctx) => {
+    await requireOrganizer(ctx, "editor");
     return await ctx.db.query("templates").collect();
   },
 });
@@ -246,7 +251,10 @@ export const getParticipantFields = query({
       group: v.string(),
     }),
   ),
-  handler: async () => PARTICIPANT_FIELDS,
+  handler: async (ctx) => {
+    await requireOrganizer(ctx, "viewer");
+    return PARTICIPANT_FIELDS;
+  },
 });
 
 /**

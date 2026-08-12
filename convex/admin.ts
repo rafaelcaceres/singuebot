@@ -4,6 +4,8 @@ import { api, internal } from "./_generated/api";
 import { rag } from "./functions/rag";
 import type { EntryId } from "@convex-dev/rag";
 import { normalizePhoneNumber } from "./utils/phoneNormalizer";
+import { getAuthUserId } from "@convex-dev/auth/server";
+import { requireOrganizer } from "./lib/requireOrganizer";
 
 // Helper function to get or create conversation for participant
 const getOrCreateConversation = async (ctx: any, participantId: any) => {
@@ -28,14 +30,33 @@ const getOrCreateConversation = async (ctx: any, participantId: any) => {
 
 // Organizer Management Functions
 
+/**
+ * Tells the caller their own approval status. Deliberately reachable before
+ * approval — it's how the frontend detects "signed in but not approved yet"
+ * and shows the pending screen instead of the console.
+ *
+ * The `email` arg is ignored for authorization: this only ever resolves the
+ * caller's own email server-side, so a signed-up-but-unapproved user can't
+ * probe whether some other email is an organizer.
+ */
 export const getOrganizerByEmail = query({
   args: {
     email: v.string(),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      return null;
+    }
+    const user = await ctx.db.get(userId);
+    const email = user?.email;
+    if (!email) {
+      return null;
+    }
+
     const organizer = await ctx.db
       .query("organizers")
-      .withIndex("by_email", (q) => q.eq("email", args.email))
+      .withIndex("by_email", (q) => q.eq("email", email))
       .first();
 
     if (organizer) return organizer;
@@ -43,7 +64,7 @@ export const getOrganizerByEmail = query({
     // Bootstrap mode: if no organizers exist at all, treat any authenticated user as owner
     const anyOrganizer = await ctx.db.query("organizers").first();
     if (!anyOrganizer) {
-      return { email: args.email, role: "owner" as const, _bootstrap: true };
+      return { email, role: "owner" as const, _bootstrap: true };
     }
 
     return null;
@@ -55,6 +76,9 @@ export const getOrganizerByEmail = query({
 export const getTemplates = query({
   args: {},
   handler: async (ctx): Promise<any[]> => {
+    // "viewer", not "editor": MessageComposer (operator inbox, open to any
+    // organizer role) needs this to list approved HSM templates to send.
+    await requireOrganizer(ctx, "viewer");
     return await ctx.runQuery(internal.functions.twilio_db.listTemplates);
   },
 });
@@ -69,6 +93,7 @@ export const createTemplate = mutation({
     stage: v.string(),
   },
   handler: async (ctx, args): Promise<any> => {
+    await requireOrganizer(ctx, "editor");
     return await ctx.runMutation(internal.functions.twilio_db.createTemplate, {
       name: args.name,
       locale: args.locale,
@@ -92,6 +117,7 @@ export const updateTemplate = mutation({
     }),
   },
   handler: async (ctx, args): Promise<any> => {
+    await requireOrganizer(ctx, "editor");
     return await ctx.runMutation(internal.functions.twilio_db.updateTemplate, args);
   },
 });
@@ -101,6 +127,7 @@ export const deleteTemplate = mutation({
     templateId: v.id("templates"),
   },
   handler: async (ctx, args): Promise<any> => {
+    await requireOrganizer(ctx, "editor");
     return await ctx.runMutation(internal.functions.twilio_db.deleteTemplate, args);
   },
 });
@@ -108,10 +135,11 @@ export const deleteTemplate = mutation({
 export const getOrganizers = query({
   args: {},
   handler: async (ctx) => {
+    await requireOrganizer(ctx, "owner");
     const organizers = await ctx.db
       .query("organizers")
       .collect();
-    
+
     return organizers;
   },
 });
@@ -122,6 +150,7 @@ export const upsertOrganizer = mutation({
     role: v.union(v.literal("owner"), v.literal("editor"), v.literal("viewer")),
   },
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "owner");
     const existing = await ctx.db
       .query("organizers")
       .withIndex("by_email", (q) => q.eq("email", args.email))
@@ -149,6 +178,7 @@ export const deleteOrganizer = mutation({
     organizerId: v.id("organizers"),
   },
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "owner");
     await ctx.db.delete(args.organizerId);
   },
 });
@@ -158,6 +188,7 @@ export const deleteOrganizer = mutation({
 export const getDashboardKPIs = query({
   args: {},
   handler: async (ctx) => {
+    await requireOrganizer(ctx, "viewer");
     // Get total participants
     const totalParticipants = await ctx.db
       .query("participants")
@@ -201,6 +232,7 @@ export const getParticipants = query({
     importSource: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "viewer");
     // Build query with most selective index first
     let participants;
 
@@ -304,6 +336,7 @@ export const getParticipantById = query({
     participantId: v.id("participants"),
   },
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "viewer");
     const participant = await ctx.db.get(args.participantId);
     if (!participant) return null;
 
@@ -339,6 +372,7 @@ export const getParticipantProfileById = query({
     participantId: v.id("participants"),
   },
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "viewer");
     const profile = await ctx.db
       .query("participant_profiles")
       .withIndex("by_participant", (q) => q.eq("participantId", args.participantId))
@@ -359,6 +393,7 @@ export const createParticipant = mutation({
     tags: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "editor");
     // Validate and format phone number
     const phoneRegex = /^\+\d{10,15}$/;
     if (!phoneRegex.test(args.phone)) {
@@ -417,6 +452,7 @@ export const updateParticipant = mutation({
     }),
   },
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "editor");
     // Check if participant exists
     const participant = await ctx.db.get(args.participantId);
     if (!participant) {
@@ -445,6 +481,7 @@ export const deleteParticipant = mutation({
     participantId: v.id("participants"),
   },
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "owner");
     // Get participant to check if exists
     const participant = await ctx.db.get(args.participantId);
     if (!participant) {
@@ -546,6 +583,7 @@ export const importParticipantsFromCSV = mutation({
     importSource: v.optional(v.string()), // CSV filename for filtering
   },
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "editor");
     const results = {
       success: 0,
       errors: [] as Array<{ row: number; error: string; data: any }>,
@@ -814,6 +852,7 @@ export const getConversationMessages = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "viewer");
     const participant = await ctx.db.get(args.participantId);
     if (!participant) return { messages: [], participant: null };
 
@@ -908,6 +947,7 @@ export const bulkDeleteConversations = mutation({
     participantIds: v.array(v.id("participants")),
   },
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "editor");
     for (const participantId of args.participantIds) {
       await ctx.scheduler.runAfter(
         0,
@@ -935,6 +975,7 @@ export const getConversations = query({
     maxMessages: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "viewer");
     const limit = args.limit || 25;
     const offset = args.offset || 0;
 
@@ -1038,6 +1079,7 @@ export const getConversations = query({
 export const getClusters = query({
   args: {},
   handler: async (ctx) => {
+    await requireOrganizer(ctx, "viewer");
     return await ctx.db.query("clusters").collect();
   },
 });
@@ -1045,6 +1087,7 @@ export const getClusters = query({
 export const getImportSources = query({
   args: {},
   handler: async (ctx) => {
+    await requireOrganizer(ctx, "viewer");
     const participants = await ctx.db.query("participants").collect();
 
     const counts = new Map<string, number>();
@@ -1069,6 +1112,7 @@ export const getKnowledgeDocuments = query({
     namespace: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "editor");
     let documents;
 
     if (args.namespace) {
@@ -1103,11 +1147,12 @@ export const getKnowledgeDocumentById = query({
     documentId: v.id("knowledge_docs"),
   },
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "editor");
     const document = await ctx.db.get(args.documentId);
     if (!document) {
       throw new Error("Document not found");
     }
-    
+
     return {
       _id: document._id,
       title: document.title,
@@ -1129,6 +1174,7 @@ export const updateKnowledgeDocument = mutation({
     }),
   },
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "editor");
     const document = await ctx.db.get(args.documentId);
     if (!document) {
       throw new Error("Document not found");
@@ -1144,6 +1190,7 @@ export const getKnowledgeDocumentStats = query({
     namespace: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "editor");
     let documents = await ctx.db.query("knowledge_docs").collect();
     if (args.namespace) {
       documents = documents.filter(doc => doc.namespace === args.namespace);
@@ -1172,6 +1219,7 @@ export const uploadKnowledgeDocument = mutation({
     namespace: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "editor");
     const namespace = args.namespace || "global_knowledge";
 
     // Replace any prior local row with the same (namespace, source) so the admin
@@ -1308,6 +1356,7 @@ export const deleteKnowledgeDocument = mutation({
     documentId: v.id("knowledge_docs"),
   },
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "editor");
     const doc = await ctx.db.get(args.documentId);
     if (!doc) {
       return;
@@ -1338,6 +1387,7 @@ export const reindexDocument = mutation({
     documentId: v.id("knowledge_docs"),
   },
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "editor");
     const document = await ctx.db.get(args.documentId);
     if (!document) {
       throw new Error("Document not found");
@@ -1408,6 +1458,9 @@ export const findKnowledgeByText = action({
     entriesDeleted: v.number(),
   }),
   handler: async (ctx, args) => {
+    await ctx.runQuery(internal.lib.requireOrganizer.assertOrganizer, {
+      minimumRole: "editor",
+    });
     if (!args.searchText.trim()) {
       throw new Error("searchText cannot be empty");
     }
@@ -1505,6 +1558,9 @@ export const reindexNamespace = action({
     failed: v.array(v.object({ documentId: v.id("knowledge_docs"), title: v.string(), error: v.string() })),
   }),
   handler: async (ctx, args) => {
+    await ctx.runQuery(internal.lib.requireOrganizer.assertOrganizer, {
+      minimumRole: "editor",
+    });
     const docs: Array<any> = await ctx.runQuery(
       internal.admin.listKnowledgeDocsByNamespace,
       { namespace: args.namespace },
@@ -1599,6 +1655,9 @@ export const purgeOrphanRagEntries = action({
     orphanKeys: v.array(v.string()),
   }),
   handler: async (ctx, args) => {
+    await ctx.runQuery(internal.lib.requireOrganizer.assertOrganizer, {
+      minimumRole: "editor",
+    });
     const ns = await rag.getNamespace(ctx, { namespace: args.namespace });
     if (!ns) {
       return { inspected: 0, deleted: 0, orphanKeys: [] };
@@ -1643,6 +1702,7 @@ export const purgeOrphanRagEntries = action({
 export const getProcessingJobs = query({
   args: {},
   handler: async (ctx) => {
+    await requireOrganizer(ctx, "editor");
     // For now, return pending documents as jobs
     const pendingDocs = await ctx.db
       .query("knowledge_docs")
@@ -1664,6 +1724,7 @@ export const getProcessingJobs = query({
 export const getParticipantRAGStats = query({
   args: {},
   handler: async (ctx): Promise<any> => {
+    await requireOrganizer(ctx, "viewer");
     return await ctx.runQuery(internal.functions.participantRAG.getStats);
   },
 });
@@ -1673,6 +1734,7 @@ export const addParticipantToRAG = mutation({
     participantId: v.id("participants"),
   },
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "editor");
     await ctx.scheduler.runAfter(0, internal.functions.participantRAG.addParticipant, {
       participantId: args.participantId,
     });
@@ -1686,6 +1748,7 @@ export const batchAddParticipantsToRAG = mutation({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "editor");
     await ctx.scheduler.runAfter(0, internal.functions.participantRAG.batchAddParticipants, {
       limit: args.limit,
     });
@@ -1700,6 +1763,7 @@ export const indexAllParticipants = mutation({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "editor");
     const limitText = args.limit ? `${args.limit}` : 'all';
     console.log(`🚀 Starting indexing of ${limitText} participants...`);
 

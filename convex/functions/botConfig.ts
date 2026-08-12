@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { query, internalQuery, mutation } from "../_generated/server";
 import { Id } from "../_generated/dataModel";
+import { requireOrganizer } from "../lib/requireOrganizer";
 
 // Get the active bot configuration (first active bot)
 export const getActiveBotConfig = internalQuery({
@@ -46,6 +47,7 @@ export const getFeatureFlags = query({
     consentRequired: v.boolean(),
   }),
   handler: async (ctx) => {
+    await requireOrganizer(ctx, "viewer");
     const bot = await ctx.db
       .query("bots")
       .withIndex("by_active", (q) => q.eq("isActive", true))
@@ -71,6 +73,7 @@ export const getActiveBotSettings = query({
   args: {},
   returns: v.any(),
   handler: async (ctx) => {
+    await requireOrganizer(ctx, "editor");
     const bot = await ctx.db
       .query("bots")
       .withIndex("by_active", (q) => q.eq("isActive", true))
@@ -118,6 +121,7 @@ export const updateBotConfig = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "owner");
     const { botId, ...updates } = args;
     await ctx.db.patch(botId, {
       ...updates,

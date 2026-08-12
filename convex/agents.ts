@@ -4,7 +4,7 @@ import { z } from "zod";
 import { v } from "convex/values";
 import { components } from "./_generated/api";
 import { internal, api } from "./_generated/api";
-import { internalAction, internalMutation, query } from "./_generated/server";
+import { internalAction, internalMutation, internalQuery } from "./_generated/server";
 
 export const FABI_PERSONALITY = `
 
@@ -629,8 +629,10 @@ export const updateMessageWithAIMetadata = internalMutation({
   },
 });
 
-// Query to get AI interactions from whatsappMessages with aiMetadata
-export const getAIInteractions = query({
+// Query to get AI interactions from whatsappMessages with aiMetadata.
+// Internal: only reachable via router.ts's /whatsapp/ai-interactions endpoint,
+// not by the React console or the public Convex client.
+export const getAIInteractions = internalQuery({
   args: {
     participantId: v.optional(v.id("participants")),
     conversationId: v.optional(v.id("conversations")),

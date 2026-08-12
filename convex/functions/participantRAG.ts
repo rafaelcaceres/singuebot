@@ -7,6 +7,7 @@ import { internal } from "../_generated/api";
 import { Id } from "../_generated/dataModel";
 import { UMAP } from "umap-js";
 import { Hdbscan } from "hdbscan";
+import { requireOrganizer } from "../lib/requireOrganizer";
 
 // Namespace for participant embeddings
 const PARTICIPANTS_NAMESPACE = "participants";
@@ -433,6 +434,9 @@ export const searchSimilarPublic = action({
     highlights: v.array(v.string()),
   })),
   handler: async (ctx, args) => {
+    await ctx.runQuery(internal.lib.requireOrganizer.assertOrganizer, {
+      minimumRole: "viewer",
+    });
     const limit = args.limit || 10;
 
     let searchQuery: string;
@@ -706,6 +710,7 @@ export const getStats = internalQuery({
 export const getRAGStats = query({
   args: {},
   handler: async (ctx) => {
+    await requireOrganizer(ctx, "viewer");
     const totalParticipants = await ctx.db.query("participants").collect();
 
     return {
@@ -725,6 +730,7 @@ export const getParticipantCount = query({
   args: {},
   returns: v.number(),
   handler: async (ctx) => {
+    await requireOrganizer(ctx, "viewer");
     const participants = await ctx.db.query("participants").collect();
     return participants.length;
   },
@@ -835,6 +841,9 @@ export const generateUMAPCache = action({
     version: v.string(),
   }),
   handler: async (ctx, args): Promise<{ cached: number; skipped: number; version: string }> => {
+    await ctx.runQuery(internal.lib.requireOrganizer.assertOrganizer, {
+      minimumRole: "viewer",
+    });
     const version = `v1-${Date.now()}`;
     console.log(`🎯 Starting UMAP cache generation (version: ${version})`);
 
@@ -1138,6 +1147,9 @@ export const runClusteringOnCache = action({
       minSamples: number;
     };
   }> => {
+    await ctx.runQuery(internal.lib.requireOrganizer.assertOrganizer, {
+      minimumRole: "viewer",
+    });
     console.log("🎯 Running HDBSCAN on cached UMAP embeddings");
 
     // Get cached UMAP embeddings
@@ -1325,6 +1337,7 @@ export const getCachedClusterResults = query({
     })
   ),
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "viewer");
     // Get the latest clustering result
     const results = await ctx.db
       .query("cluster_results_cache")
@@ -1387,6 +1400,9 @@ export const generateClusterInsights = action({
     count: v.number(),
   })),
   handler: async (ctx, args) => {
+    await ctx.runQuery(internal.lib.requireOrganizer.assertOrganizer, {
+      minimumRole: "viewer",
+    });
     console.log("🤖 Generating AI insights for clusters");
 
     // Group points by cluster
@@ -1569,6 +1585,9 @@ export const generateClusterAnalysis = action({
     totalParticipants: v.number(),
   }),
   handler: async (ctx, args) => {
+    await ctx.runQuery(internal.lib.requireOrganizer.assertOrganizer, {
+      minimumRole: "viewer",
+    });
     console.log("🎯 Starting cluster analysis");
 
     // Step 1: Get all participants with their data

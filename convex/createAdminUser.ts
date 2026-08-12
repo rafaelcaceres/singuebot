@@ -1,7 +1,12 @@
-import { mutation } from "./_generated/server";
+import { internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 
-export const createAdminUser = mutation({
+/**
+ * Bootstrap tool only — run via `npx convex run createAdminUser:createAdminUser
+ * '{"email":"...","password":"..."}'`. Deliberately internal: this grants
+ * owner access, so it must never be reachable from the public client.
+ */
+export const createAdminUser = internalMutation({
   args: {
     email: v.string(),
     password: v.string(),

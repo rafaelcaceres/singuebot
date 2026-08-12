@@ -1,11 +1,13 @@
 import { v } from "convex/values";
 import { query } from "./_generated/server";
+import { requireOrganizer } from "./lib/requireOrganizer";
 
 // Real-time Analytics Functions for Enhanced Dashboard
 
 export const getRealTimeMetrics = query({
   args: {},
   handler: async (ctx) => {
+    await requireOrganizer(ctx, "viewer");
     const now = Date.now();
     const oneDayAgo = now - (24 * 60 * 60 * 1000);
     const oneWeekAgo = now - (7 * 24 * 60 * 60 * 1000);
@@ -101,6 +103,7 @@ export const getMessageVolumeChart = query({
     days: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "viewer");
     const days = args.days || 7;
     const now = Date.now();
     const startTime = now - (days * 24 * 60 * 60 * 1000);
@@ -149,6 +152,7 @@ export const getParticipantGrowthChart = query({
     days: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "viewer");
     const days = args.days || 30;
     const now = Date.now();
     const startTime = now - (days * 24 * 60 * 60 * 1000);
@@ -192,6 +196,7 @@ export const getParticipantGrowthChart = query({
 export const getInterviewAnalytics = query({
   args: {},
   handler: async (ctx) => {
+    await requireOrganizer(ctx, "viewer");
     const sessions = await ctx.db.query("interview_sessions").collect();
     
     // Stage distribution
@@ -233,6 +238,7 @@ export const getInterviewAnalytics = query({
 export const getSystemHealth = query({
   args: {},
   handler: async (ctx) => {
+    await requireOrganizer(ctx, "viewer");
     const now = Date.now();
     const oneHourAgo = now - (60 * 60 * 1000);
 
@@ -303,6 +309,7 @@ export const getTopParticipants = query({
     metric: v.optional(v.union(v.literal("messages"), v.literal("engagement"))),
   },
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "viewer");
     const limit = args.limit || 10;
     const metric = args.metric || "messages";
 
@@ -363,6 +370,7 @@ export const getRecentActivity = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "viewer");
     const limit = args.limit || 20;
     const now = Date.now();
     const oneDayAgo = now - (24 * 60 * 60 * 1000);

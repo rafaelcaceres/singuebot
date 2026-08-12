@@ -224,7 +224,7 @@ http.route({
       const phoneNumber = url.searchParams.get("phoneNumber");
       const limit = parseInt(url.searchParams.get("limit") || "50");
 
-      const interactions = await ctx.runQuery(api.agents.getAIInteractions, {
+      const interactions = await ctx.runQuery(internal.agents.getAIInteractions, {
         phoneNumber: phoneNumber || undefined,
         limit,
       });

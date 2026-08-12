@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { query } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
+import { requireOrganizer } from "./lib/requireOrganizer";
 
 // Optimized Analytics Functions with Caching and Efficient Queries
 
@@ -37,6 +38,7 @@ export const getRealTimeMetricsOptimized = query({
     }),
   }),
   handler: async (ctx) => {
+    await requireOrganizer(ctx, "viewer");
     const now = Date.now();
     const oneDayAgo = now - (24 * 60 * 60 * 1000);
     const oneWeekAgo = now - (7 * 24 * 60 * 60 * 1000);
@@ -176,6 +178,7 @@ export const getTopParticipantsOptimized = query({
     }),
   })),
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "viewer");
     const limit = args.limit || 10;
     const metric = args.metric || "engagement";
 
@@ -269,6 +272,7 @@ export const getRecentActivityOptimized = query({
     }),
   })),
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "viewer");
     const limit = args.limit || 20;
     const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
 

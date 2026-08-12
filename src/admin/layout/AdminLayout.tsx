@@ -4,6 +4,7 @@ import { api } from "../../../convex/_generated/api";
 import { Navigation } from "../components/Navigation";
 import { SignOutButton } from "../../SignOutButton";
 import { ThemeToggle } from "../../components/ThemeToggle";
+import { useAuth } from "../../hooks/useAuth";
 
 /**
  * Routes that are full-height workspaces rather than documents: they manage
@@ -14,13 +15,14 @@ const FULL_BLEED_ROUTES = ["/atendimento"];
 
 export function AdminLayout() {
   const loggedInUser = useQuery(api.auth.loggedInUser);
+  const { isLoading: authLoading, isPendingApproval } = useAuth();
   const location = useLocation();
 
   const isFullBleed = FULL_BLEED_ROUTES.some(
     (route) => location.pathname === route || location.pathname.startsWith(`${route}/`)
   );
 
-  if (loggedInUser === undefined) {
+  if (loggedInUser === undefined || authLoading) {
     return (
       <div className="flex justify-center items-center min-h-screen bg-background">
         <div className="text-center space-y-4">
@@ -33,6 +35,30 @@ export function AdminLayout() {
 
   if (loggedInUser === null) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Signed in, but nobody has added this email to `organizers` yet. This is
+  // the actual authorization boundary — the Convex functions behind every
+  // route in this shell reject unapproved callers regardless of what the
+  // frontend renders — but showing a real screen instead of a data-less
+  // dashboard tells the person what's actually happening.
+  if (isPendingApproval) {
+    return (
+      <div className="flex justify-center items-center min-h-screen bg-background px-6">
+        <div className="max-w-md w-full text-center space-y-4">
+          <h1 className="text-xl font-semibold tracking-tight text-foreground">
+            Conta aguardando aprovação
+          </h1>
+          <p className="text-muted-foreground text-sm">
+            Sua conta ({loggedInUser.email}) foi criada, mas ainda não tem acesso ao
+            console. Peça para um administrador aprovar seu acesso.
+          </p>
+          <div className="pt-2">
+            <SignOutButton />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // A real app shell: the viewport is the frame, and scrolling happens inside

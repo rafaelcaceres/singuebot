@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { query, mutation, action } from "./_generated/server";
 import { api, internal } from "./_generated/api";
 import { postTemplateMessage, statusCallbackUrl } from "./lib/twilioClient";
+import { requireOrganizer } from "./lib/requireOrganizer";
 
 /** WhatsApp's free-form service window. Outside it, only approved HSM templates send. */
 export const WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -18,6 +19,7 @@ export const WINDOW_MS = 24 * 60 * 60 * 1000;
 export const getOperatorMetrics = query({
   args: {},
   handler: async (ctx) => {
+    await requireOrganizer(ctx, "viewer");
     const now = Date.now();
     const fifteenMinutesAgo = now - (15 * 60 * 1000);
     const todayStart = new Date();
@@ -89,6 +91,7 @@ export const getOperatorConversations = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "viewer");
     const limit = args.limit || 50;
     const now = Date.now();
     const fifteenMinutesAgo = now - (15 * 60 * 1000);
@@ -228,6 +231,7 @@ export const getConversationDetail = query({
     participantId: v.id("participants"),
   },
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "viewer");
     // Get participant
     const participant = await ctx.db.get(args.participantId);
     if (!participant) {
@@ -355,6 +359,7 @@ export const takeOverConversation = mutation({
     participantId: v.id("participants"),
   },
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "editor");
     // Find or create genericConversation for this participant
     let genericConv = await ctx.db
       .query("genericConversations")
@@ -451,6 +456,7 @@ export const releaseConversation = mutation({
     participantId: v.id("participants"),
   },
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "editor");
     const genericConv = await ctx.db
       .query("genericConversations")
       .withIndex("by_participant", (q) => q.eq("participantId", args.participantId))
@@ -480,6 +486,7 @@ export const toggleNeedsAttention = mutation({
     needsHuman: v.boolean(),
   },
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "editor");
     const now = Date.now();
 
     let genericConv = await ctx.db
@@ -559,6 +566,9 @@ export const markConversationAsRead = mutation({
     participantId: v.id("participants"),
   },
   handler: async (ctx, args) => {
+    // "viewer": marking-as-read happens automatically when a conversation is
+    // opened, so it's part of viewing rather than an editorial action.
+    await requireOrganizer(ctx, "viewer");
     // Get all unread inbound messages for this participant
     const unreadMessages = await ctx.db
       .query("whatsappMessages")
@@ -602,6 +612,9 @@ export const sendOperatorMessage = action({
     message: v.string(),
   },
   handler: async (ctx, args) => {
+    await ctx.runQuery(internal.lib.requireOrganizer.assertOrganizer, {
+      minimumRole: "editor",
+    });
     const participant = await ctx.runQuery(api.admin.getParticipantById, {
       participantId: args.participantId,
     });
@@ -644,6 +657,9 @@ export const sendOperatorTemplate = action({
     ctx,
     args,
   ): Promise<{ success: boolean; renderedBody?: string }> => {
+    await ctx.runQuery(internal.lib.requireOrganizer.assertOrganizer, {
+      minimumRole: "editor",
+    });
     const resolved: {
       templateName: string;
       contentSid: string;

@@ -176,6 +176,7 @@ export const previewBroadcast = query({
     ),
   }),
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "viewer");
     const template = await ctx.db.get(args.templateId);
     if (!template) throw new Error("Template não encontrado");
 
@@ -969,17 +970,22 @@ export const retryFailed = mutation({
 
 export const getBroadcast = query({
   args: { broadcastId: v.id("broadcasts") },
-  handler: async (ctx, args) => ctx.db.get(args.broadcastId),
+  handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "viewer");
+    return ctx.db.get(args.broadcastId);
+  },
 });
 
 export const listBroadcasts = query({
   args: { limit: v.optional(v.number()) },
-  handler: async (ctx, args) =>
-    ctx.db
+  handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "viewer");
+    return ctx.db
       .query("broadcasts")
       .withIndex("by_created")
       .order("desc")
-      .take(args.limit ?? 50),
+      .take(args.limit ?? 50);
+  },
 });
 
 export const listRecipients = query({
@@ -999,6 +1005,7 @@ export const listRecipients = query({
     paginationOpts: paginationOptsValidator,
   },
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "viewer");
     const status = args.status;
     if (status) {
       return await ctx.db
@@ -1026,6 +1033,7 @@ export const getFailureSummary = query({
     }),
   ),
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "viewer");
     const failed = await ctx.db
       .query("broadcastRecipients")
       .withIndex("by_broadcast_status", (q) =>
@@ -1070,6 +1078,7 @@ export const getSkippedSummary = query({
     }),
   ),
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "viewer");
     const skipped = await ctx.db
       .query("broadcastRecipients")
       .withIndex("by_broadcast_status", (q) =>

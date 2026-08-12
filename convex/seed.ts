@@ -1,7 +1,11 @@
-import { mutation } from "./_generated/server";
+import { internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 
-export const seedAdminUser = mutation({
+// All seed/setup tools below are internal — run via `npx convex run seed:<name>`.
+// They insert owner-role organizers or bootstrap data, so they must never be
+// reachable from the public client.
+
+export const seedAdminUser = internalMutation({
   args: {
     email: v.string(),
   },
@@ -28,7 +32,7 @@ export const seedAdminUser = mutation({
   },
 });
 
-export const listOrganizers = mutation({
+export const listOrganizers = internalMutation({
   args: {},
   handler: async (ctx) => {
     const organizers = await ctx.db
@@ -41,7 +45,7 @@ export const listOrganizers = mutation({
 });
 
 // Seed a generic university support bot
-export const seedUniversityBot = mutation({
+export const seedUniversityBot = internalMutation({
   args: {},
   handler: async (ctx) => {
     // Check if tenant already exists

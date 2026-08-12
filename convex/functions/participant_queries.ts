@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { query, mutation } from "../_generated/server";
+import { requireOrganizer } from "../lib/requireOrganizer";
 
 /**
  * Get participants by company
@@ -9,6 +10,7 @@ export const getParticipantsByEmpresa = query({
     empresa: v.string(),
   },
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "viewer");
     return await ctx.db
       .query("participants")
       .withIndex("by_empresa", (q) => q.eq("empresa", args.empresa))
@@ -24,6 +26,7 @@ export const getParticipantsBySetor = query({
     setor: v.string(),
   },
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "viewer");
     return await ctx.db
       .query("participants")
       .withIndex("by_setor", (q) => q.eq("setor", args.setor))
@@ -39,6 +42,7 @@ export const getParticipantsByCargo = query({
     cargo: v.string(),
   },
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "viewer");
     return await ctx.db
       .query("participants")
       .withIndex("by_cargo", (q) => q.eq("cargo", args.cargo))
@@ -55,9 +59,10 @@ export const getParticipantsByEmpresaSetor = query({
     setor: v.string(),
   },
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "viewer");
     return await ctx.db
       .query("participants")
-      .withIndex("by_empresa_setor", (q) => 
+      .withIndex("by_empresa_setor", (q) =>
         q.eq("empresa", args.empresa).eq("setor", args.setor)
       )
       .collect();
@@ -71,6 +76,7 @@ export const getUniqueEmpresas = query({
   args: {},
   returns: v.array(v.string()),
   handler: async (ctx) => {
+    await requireOrganizer(ctx, "viewer");
     const participants = await ctx.db.query("participants").collect();
     const empresas = new Set(
       participants
@@ -88,6 +94,7 @@ export const getUniqueSetores = query({
   args: {},
   returns: v.array(v.string()),
   handler: async (ctx) => {
+    await requireOrganizer(ctx, "viewer");
     const participants = await ctx.db.query("participants").collect();
     const setores = new Set(
       participants
@@ -105,6 +112,7 @@ export const getUniqueCargos = query({
   args: {},
   returns: v.array(v.string()),
   handler: async (ctx) => {
+    await requireOrganizer(ctx, "viewer");
     const participants = await ctx.db.query("participants").collect();
     const cargos = new Set(
       participants
@@ -126,6 +134,7 @@ export const updateParticipantProfessionalInfo = mutation({
     setor: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "editor");
     const { participantId, ...updates } = args;
     
     // Filter out undefined values
@@ -152,8 +161,9 @@ export const searchParticipants = query({
     name: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "viewer");
     let participants = await ctx.db.query("participants").collect();
-    
+
     // Apply filters
     if (args.cargo) {
       participants = participants.filter((p: any) => 

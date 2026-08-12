@@ -14,6 +14,8 @@ export interface UseAuthReturn {
   user: AuthUser | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  /** Signed in, but no organizers row exists yet — not approved for console access. */
+  isPendingApproval: boolean;
   hasRole: (requiredRole: UserRole | UserRole[]) => boolean;
   canAccess: (requiredRoles: UserRole[]) => boolean;
 }
@@ -34,17 +36,25 @@ export function useAuth(): UseAuthReturn {
     loggedInUser?.email ? { email: loggedInUser.email } : "skip"
   );
 
-  const isLoading = convexAuthLoading || 
+  const isLoading = convexAuthLoading ||
     (isAuthenticated && loggedInUser === undefined) ||
     Boolean(loggedInUser?.email && organizer === undefined);
 
-  // Transform Convex user to our AuthUser interface
+  // Transform Convex user to our AuthUser interface. `role` is only set once
+  // an `organizers` row exists for this email — it used to default to
+  // "viewer", which let any freshly signed-up, unapproved account into the
+  // console. Approval happens by adding that row (e.g. directly in the
+  // Convex dashboard); until then `role` stays undefined.
   const user: AuthUser | null = loggedInUser ? {
     _id: loggedInUser._id,
     email: loggedInUser.email,
-    role: organizer?.role || "viewer", // Get role from organizers table
+    role: organizer?.role,
     name: loggedInUser.name,
   } : null;
+
+  const isPendingApproval = Boolean(
+    !isLoading && isAuthenticated && loggedInUser && !organizer?.role,
+  );
 
   /**
    * Check if user has a specific role or higher in the hierarchy
@@ -73,6 +83,7 @@ export function useAuth(): UseAuthReturn {
     user,
     isLoading,
     isAuthenticated: Boolean(isAuthenticated && user),
+    isPendingApproval,
     hasRole,
     canAccess,
   };
