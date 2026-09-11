@@ -6,6 +6,8 @@ import type { EntryId } from "@convex-dev/rag";
 import { normalizePhoneNumber } from "./utils/phoneNormalizer";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { requireOrganizer } from "./lib/requireOrganizer";
+import { addToImportList } from "./lib/participantImports";
+import type { Doc } from "./_generated/dataModel";
 
 // Helper function to get or create conversation for participant
 const getOrCreateConversation = async (ctx: any, participantId: any) => {
@@ -237,11 +239,15 @@ export const getParticipants = query({
     let participants;
 
     if (args.importSource) {
-      // Filter by import source (CSV filename)
-      participants = await ctx.db
-        .query("participants")
+      // Filter by import source (CSV filename). Goes through the membership
+      // table so people who already existed when the CSV was imported count as
+      // part of the list too, not only the ones it created.
+      const memberships = await ctx.db
+        .query("participantImports")
         .withIndex("by_import_source", (q) => q.eq("importSource", args.importSource!))
         .collect();
+      const members = await Promise.all(memberships.map((m) => ctx.db.get(m.participantId)));
+      participants = members.filter((p): p is Doc<"participants"> => p !== null);
 
       // Apply additional filters in memory
       if (args.clusterId) {
@@ -529,6 +535,16 @@ export const deleteParticipant = mutation({
       await ctx.db.delete(profile._id);
     }
 
+    // Remove from imported lists
+    const importMemberships = await ctx.db
+      .query("participantImports")
+      .withIndex("by_participant_source", (q) => q.eq("participantId", args.participantId))
+      .collect();
+
+    for (const membership of importMemberships) {
+      await ctx.db.delete(membership._id);
+    }
+
     // Remove participant from RAG
     await ctx.scheduler.runAfter(0, internal.functions.participantRAG.removeParticipant, {
       participantId: args.participantId,
@@ -763,6 +779,8 @@ export const importParticipantsFromCSV = mutation({
             }
           }
 
+          await addToImportList(ctx, existingParticipant._id, args.importSource);
+
           results.duplicates.push({
             row: rowNumber,
             identifierType: duplicateField || "phone",
@@ -812,6 +830,8 @@ export const importParticipantsFromCSV = mutation({
           tags: [],
           createdAt: Date.now(),
         });
+
+        await addToImportList(ctx, participantId, args.importSource);
 
         // Create participant profile with rich text fields (if any exist)
         if (row.realizacoes || row.visaoFuturo || row.desafiosSuperados ||
@@ -1088,14 +1108,13 @@ export const getImportSources = query({
   args: {},
   handler: async (ctx) => {
     await requireOrganizer(ctx, "viewer");
-    const participants = await ctx.db.query("participants").collect();
+    const memberships = await ctx.db.query("participantImports").collect();
 
     const counts = new Map<string, number>();
-    for (const participant of participants) {
-      if (!participant.importSource) continue;
+    for (const membership of memberships) {
       counts.set(
-        participant.importSource,
-        (counts.get(participant.importSource) ?? 0) + 1
+        membership.importSource,
+        (counts.get(membership.importSource) ?? 0) + 1
       );
     }
 

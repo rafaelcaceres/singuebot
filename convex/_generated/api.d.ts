@@ -37,8 +37,10 @@ import type * as functions_templateVariables from "../functions/templateVariable
 import type * as functions_twilio from "../functions/twilio.js";
 import type * as functions_twilio_db from "../functions/twilio_db.js";
 import type * as http from "../http.js";
+import type * as lib_participantImports from "../lib/participantImports.js";
 import type * as lib_requireOrganizer from "../lib/requireOrganizer.js";
 import type * as lib_twilioClient from "../lib/twilioClient.js";
+import type * as migrations_backfillParticipantImports from "../migrations/backfillParticipantImports.js";
 import type * as migrations_consolidateParticipants from "../migrations/consolidateParticipants.js";
 import type * as migrations_migrateToGenericSystem from "../migrations/migrateToGenericSystem.js";
 import type * as migrations_runMigration from "../migrations/runMigration.js";
@@ -97,8 +99,10 @@ declare const fullApi: ApiFromModules<{
   "functions/twilio": typeof functions_twilio;
   "functions/twilio_db": typeof functions_twilio_db;
   http: typeof http;
+  "lib/participantImports": typeof lib_participantImports;
   "lib/requireOrganizer": typeof lib_requireOrganizer;
   "lib/twilioClient": typeof lib_twilioClient;
+  "migrations/backfillParticipantImports": typeof migrations_backfillParticipantImports;
   "migrations/consolidateParticipants": typeof migrations_consolidateParticipants;
   "migrations/migrateToGenericSystem": typeof migrations_migrateToGenericSystem;
   "migrations/runMigration": typeof migrations_runMigration;

@@ -409,26 +409,40 @@ export const enqueueRecipients = internalMutation({
       isDone = nextOffset >= ids.length;
     } else {
       const filter = broadcast.selection;
-      const page = filter.clusterId
-        ? await ctx.db
-            .query("participants")
-            .withIndex("by_cluster", (q) => q.eq("clusterId", filter.clusterId))
-            .paginate({ numItems: ENQUEUE_CHUNK, cursor: broadcast.enqueueCursor ?? null })
-        : filter.importSource
+      const cursor = broadcast.enqueueCursor ?? null;
+
+      if (filter.importSource) {
+        // Via the membership table so people who already existed when the CSV
+        // was imported are included, not only the ones it created.
+        const importSource = filter.importSource;
+        const page = await ctx.db
+          .query("participantImports")
+          .withIndex("by_import_source", (q) => q.eq("importSource", importSource))
+          .paginate({ numItems: ENQUEUE_CHUNK, cursor });
+
+        for (const membership of page.page) {
+          const participant = await ctx.db.get(membership.participantId);
+          if (!participant) continue;
+          if (filter.clusterId && participant.clusterId !== filter.clusterId) continue;
+          participants.push(participant);
+        }
+        isDone = page.isDone;
+        nextCursor = page.continueCursor;
+      } else {
+        const page = filter.clusterId
           ? await ctx.db
               .query("participants")
-              .withIndex("by_import_source", (q) =>
-                q.eq("importSource", filter.importSource),
-              )
-              .paginate({ numItems: ENQUEUE_CHUNK, cursor: broadcast.enqueueCursor ?? null })
+              .withIndex("by_cluster", (q) => q.eq("clusterId", filter.clusterId))
+              .paginate({ numItems: ENQUEUE_CHUNK, cursor })
           : await ctx.db
               .query("participants")
               .withIndex("by_created")
-              .paginate({ numItems: ENQUEUE_CHUNK, cursor: broadcast.enqueueCursor ?? null });
+              .paginate({ numItems: ENQUEUE_CHUNK, cursor });
 
-      participants = page.page;
-      isDone = page.isDone;
-      nextCursor = page.continueCursor;
+        participants = page.page;
+        isDone = page.isDone;
+        nextCursor = page.continueCursor;
+      }
 
       if (filter.consentOnly) {
         participants = participants.filter((p) => p.consent);

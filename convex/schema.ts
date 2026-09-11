@@ -370,6 +370,17 @@ const applicationTables = {
   })
     .index("by_participant", ["participantId"]),
 
+  // Imported CSV lists each participant belongs to. A person can appear in several
+  // lists over time, which the single participants.importSource field (first
+  // origin only) can't express — this table is what list filters query.
+  participantImports: defineTable({
+    participantId: v.id("participants"),
+    importSource: v.string(), // CSV filename
+    importedAt: v.number(),
+  })
+    .index("by_import_source", ["importSource"])
+    .index("by_participant_source", ["participantId", "importSource"]),
+
   // Note: Participant embeddings are now managed by Convex RAG (@convex-dev/rag)
   // See convex/functions/participantRAG.ts for implementation
   // This eliminates ~500 lines of custom vector search code
