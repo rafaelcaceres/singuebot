@@ -7,7 +7,8 @@ import { normalizePhoneNumber } from "./utils/phoneNormalizer";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { requireOrganizer } from "./lib/requireOrganizer";
 import { addToImportList } from "./lib/participantImports";
-import type { Doc } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
+import type { QueryCtx } from "./_generated/server";
 
 // Helper function to get or create conversation for participant
 const getOrCreateConversation = async (ctx: any, participantId: any) => {
@@ -224,74 +225,87 @@ export const getDashboardKPIs = query({
 
 // Participant Management Functions
 
+const participantFilterArgs = {
+  clusterId: v.optional(v.id("clusters")),
+  consent: v.optional(v.boolean()),
+  stage: v.optional(v.string()),
+  importSource: v.optional(v.string()),
+};
+
+// Everyone matching the participant list filters. Shared by the paginated table
+// query and "select all", so both always agree on who is in the filtered set.
+const findFilteredParticipants = async (
+  ctx: QueryCtx,
+  args: { clusterId?: Id<"clusters">; consent?: boolean; stage?: string; importSource?: string },
+): Promise<Doc<"participants">[]> => {
+  // Build query with most selective index first
+  let participants: Doc<"participants">[];
+
+  if (args.importSource) {
+    // Filter by import source (CSV filename). Goes through the membership
+    // table so people who already existed when the CSV was imported count as
+    // part of the list too, not only the ones it created.
+    const memberships = await ctx.db
+      .query("participantImports")
+      .withIndex("by_import_source", (q) => q.eq("importSource", args.importSource!))
+      .collect();
+    const members = await Promise.all(memberships.map((m) => ctx.db.get(m.participantId)));
+    participants = members.filter((p): p is Doc<"participants"> => p !== null);
+
+    // Apply additional filters in memory
+    if (args.clusterId) {
+      participants = participants.filter(p => p.clusterId === args.clusterId);
+    }
+    if (args.consent !== undefined) {
+      participants = participants.filter(p => p.consent === args.consent!);
+    }
+  } else if (args.clusterId) {
+    // Use cluster index (likely most selective)
+    participants = await ctx.db
+      .query("participants")
+      .withIndex("by_cluster", (q) => q.eq("clusterId", args.clusterId))
+      .collect();
+
+    // Apply consent filter in memory if needed
+    if (args.consent !== undefined) {
+      participants = participants.filter(p => p.consent === args.consent!);
+    }
+  } else if (args.consent !== undefined) {
+    // Use consent index
+    participants = await ctx.db
+      .query("participants")
+      .withIndex("by_consent", (q) => q.eq("consent", args.consent!))
+      .collect();
+  } else {
+    // No filters - use creation time index for better performance
+    participants = await ctx.db
+      .query("participants")
+      .withIndex("by_created")
+      .collect();
+  }
+
+  // Filter by stage if provided (requires checking interview_sessions)
+  const stage = args.stage;
+  if (!stage) return participants;
+
+  const sessions = await ctx.db
+    .query("interview_sessions")
+    .withIndex("by_step", (q) => q.eq("step", stage))
+    .collect();
+
+  const participantIds = new Set(sessions.map(s => s.participantId));
+  return participants.filter(p => participantIds.has(p._id));
+};
+
 export const getParticipants = query({
   args: {
     limit: v.optional(v.number()),
     offset: v.optional(v.number()),
-    clusterId: v.optional(v.id("clusters")),
-    consent: v.optional(v.boolean()),
-    stage: v.optional(v.string()),
-    importSource: v.optional(v.string()),
+    ...participantFilterArgs,
   },
   handler: async (ctx, args) => {
     await requireOrganizer(ctx, "viewer");
-    // Build query with most selective index first
-    let participants;
-
-    if (args.importSource) {
-      // Filter by import source (CSV filename). Goes through the membership
-      // table so people who already existed when the CSV was imported count as
-      // part of the list too, not only the ones it created.
-      const memberships = await ctx.db
-        .query("participantImports")
-        .withIndex("by_import_source", (q) => q.eq("importSource", args.importSource!))
-        .collect();
-      const members = await Promise.all(memberships.map((m) => ctx.db.get(m.participantId)));
-      participants = members.filter((p): p is Doc<"participants"> => p !== null);
-
-      // Apply additional filters in memory
-      if (args.clusterId) {
-        participants = participants.filter(p => p.clusterId === args.clusterId);
-      }
-      if (args.consent !== undefined) {
-        participants = participants.filter(p => p.consent === args.consent!);
-      }
-    } else if (args.clusterId) {
-      // Use cluster index (likely most selective)
-      participants = await ctx.db
-        .query("participants")
-        .withIndex("by_cluster", (q) => q.eq("clusterId", args.clusterId))
-        .collect();
-
-      // Apply consent filter in memory if needed
-       if (args.consent !== undefined) {
-         participants = participants.filter(p => p.consent === args.consent!);
-      }
-    } else if (args.consent !== undefined) {
-      // Use consent index
-      participants = await ctx.db
-        .query("participants")
-        .withIndex("by_consent", (q) => q.eq("consent", args.consent!))
-        .collect();
-    } else {
-      // No filters - use creation time index for better performance
-      participants = await ctx.db
-        .query("participants")
-        .withIndex("by_created")
-        .collect();
-    }
-
-    // Filter by stage if provided (requires checking interview_sessions)
-    let filteredParticipants = participants;
-    if (args.stage) {
-      const sessions = await ctx.db
-        .query("interview_sessions")
-        .withIndex("by_step", (q) => args.stage ? q.eq("step", args.stage) : q)
-        .collect();
-      
-      const participantIds = new Set(sessions.map(s => s.participantId));
-      filteredParticipants = participants.filter(p => participantIds.has(p._id));
-    }
+    const filteredParticipants = await findFilteredParticipants(ctx, args);
 
     // Apply pagination
     const offset = args.offset || 0;
@@ -334,6 +348,18 @@ export const getParticipants = query({
       total: filteredParticipants.length,
       hasMore: offset + limit < filteredParticipants.length,
     };
+  },
+});
+
+// Ids of every participant matching the filters — backs "select all N" in the
+// participants table, which only ever loads one page.
+export const getParticipantIds = query({
+  args: participantFilterArgs,
+  returns: v.array(v.id("participants")),
+  handler: async (ctx, args) => {
+    await requireOrganizer(ctx, "viewer");
+    const participants = await findFilteredParticipants(ctx, args);
+    return participants.map((p) => p._id);
   },
 });
 

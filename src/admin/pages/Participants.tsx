@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useQuery, useMutation } from 'convex/react';
+import { useQuery, useMutation, useConvex } from 'convex/react';
 import { useNavigate } from 'react-router-dom';
 import {
   useReactTable,
@@ -71,12 +71,15 @@ export const Participants: React.FC = () => {
   const [importSourceFilter, setImportSourceFilter] = useState<string>('');
 
   // Fetch data
-  const participantsData = useQuery(api.admin.getParticipants, {
-    limit: pagination.pageSize,
-    offset: pagination.pageIndex * pagination.pageSize,
-    clusterId: (clusterFilter || undefined) as any,
+  const filterArgs = {
+    clusterId: (clusterFilter || undefined) as Id<'clusters'> | undefined,
     stage: stageFilter || undefined,
     importSource: importSourceFilter || undefined,
+  };
+  const participantsData = useQuery(api.admin.getParticipants, {
+    ...filterArgs,
+    limit: pagination.pageSize,
+    offset: pagination.pageIndex * pagination.pageSize,
   });
 
   const clusters = useQuery(api.admin.getClusters);
@@ -123,6 +126,49 @@ export const Participants: React.FC = () => {
   const isIndeterminate = selectedParticipants.size > 0 && !isAllSelected;
 
   const hasSelection = selectedParticipants.size > 0;
+
+  // "Select all" across pages (Gmail-style). The table only ever holds one page,
+  // so the ids of everyone matching the filters come from the server — a one-off
+  // fetch rather than a subscription, since they're only needed at click time.
+  // They're remembered with the filters they were fetched for, so the selection
+  // bar can tell "the whole filtered set" apart from "just this page".
+  const convex = useConvex();
+  const [matchingSelection, setMatchingSelection] = useState<{ key: string; ids: string[] } | null>(null);
+  const [isSelectingAllMatching, setIsSelectingAllMatching] = useState(false);
+  const filterKey = JSON.stringify(filterArgs);
+  const totalMatching = participantsData?.total ?? 0;
+  const pageRowCount = participantsData?.participants.length ?? 0;
+  const filterSuffix = clusterFilter || stageFilter || importSourceFilter ? ' deste filtro' : '';
+
+  const allMatchingSelected =
+    matchingSelection?.key === filterKey &&
+    matchingSelection.ids.length === totalMatching &&
+    matchingSelection.ids.every(id => selectedParticipants.has(id));
+
+  // Search only narrows the rows of the current page (client-side), so offering
+  // "all N" while searching would select people the operator can't see.
+  const canOfferSelectAllMatching =
+    isAllSelected && !allMatchingSelected && !globalFilter && totalMatching > pageRowCount;
+
+  const handleSelectAllMatching = async () => {
+    setIsSelectingAllMatching(true);
+    try {
+      const ids = await convex.query(api.admin.getParticipantIds, filterArgs);
+      setSelectedParticipants(prev => new Set([...prev, ...ids]));
+      setMatchingSelection({ key: filterKey, ids });
+    } catch (error) {
+      toast.error('Não foi possível selecionar todos', {
+        description: error instanceof Error ? error.message : 'Tente novamente.',
+      });
+    } finally {
+      setIsSelectingAllMatching(false);
+    }
+  };
+
+  const handleClearSelection = () => {
+    setSelectedParticipants(new Set());
+    setMatchingSelection(null);
+  };
 
   const columns = useMemo<ColumnDef<Participant, any>[]>(
     () => [
@@ -468,6 +514,44 @@ export const Participants: React.FC = () => {
 
       {/* Table */}
       <div className="bg-card shadow rounded-lg border border-border overflow-hidden">
+        {/* Selection bar: the selection spans pages, so the checkboxes alone can't
+            show how far it reaches. Also where "this page" becomes "everyone
+            matching the filters". */}
+        {hasSelection && (
+          <div
+            role="status"
+            className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border bg-muted px-6 py-2.5 text-sm text-foreground"
+          >
+            <span>
+              {allMatchingSelected
+                ? `Todos os ${totalMatching} participantes${filterSuffix} estão selecionados.`
+                : isAllSelected && selectedParticipants.size === pageRowCount
+                  ? `Os ${pageRowCount} participantes desta página estão selecionados.`
+                  : `${selectedParticipants.size} participante(s) selecionado(s).`}
+            </span>
+            {canOfferSelectAllMatching && (
+              <Button
+                variant="link"
+                size="sm"
+                className="h-auto p-0"
+                disabled={isSelectingAllMatching}
+                onClick={() => void handleSelectAllMatching()}
+              >
+                {isSelectingAllMatching
+                  ? 'Selecionando...'
+                  : `Selecionar todos os ${totalMatching} participantes${filterSuffix}`}
+              </Button>
+            )}
+            <Button
+              variant="link"
+              size="sm"
+              className="h-auto p-0 text-muted-foreground"
+              onClick={handleClearSelection}
+            >
+              Limpar seleção
+            </Button>
+          </div>
+        )}
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-border">
             <thead className="bg-muted">
