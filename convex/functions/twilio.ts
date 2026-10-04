@@ -138,6 +138,16 @@ export const processInboundMessage = internalAction({
         return;
       }
 
+      // Operator took over this conversation: the message is already stored for the
+      // console, so the bot stays silent (no consent prompt, no AI reply).
+      const operatorMode: boolean = await ctx.runQuery(internal.operatorDashboard.isOperatorMode, {
+        participantId: participant._id,
+      });
+      if (operatorMode) {
+        console.log("🙋 Twilio: Operator mode active, skipping bot reply for", args.from);
+        return;
+      }
+
       // Check bot config for consent requirement
       const botConfig = await ctx.runQuery(internal.functions.botConfig.getActiveBotConfig);
       const consentRequired = botConfig?.config?.consentRequired ?? true;

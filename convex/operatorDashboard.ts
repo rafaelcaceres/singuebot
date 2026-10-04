@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { query, mutation, action } from "./_generated/server";
+import { query, mutation, action, internalQuery } from "./_generated/server";
 import { api, internal } from "./_generated/api";
 import { postTemplateMessage, statusCallbackUrl } from "./lib/twilioClient";
 import { requireOrganizer } from "./lib/requireOrganizer";
@@ -346,6 +346,26 @@ export const getConversationDetail = query({
       },
       genericConversationId: genericConversation?._id || null,
     };
+  },
+});
+
+/**
+ * Whether an operator has taken over this participant's conversation.
+ * The inbound pipeline checks this to keep the bot silent while a human is handling it.
+ */
+export const isOperatorMode = internalQuery({
+  args: {
+    participantId: v.id("participants"),
+  },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const genericConv = await ctx.db
+      .query("genericConversations")
+      .withIndex("by_participant", (q) => q.eq("participantId", args.participantId))
+      .first();
+
+    const context = genericConv?.context as { operatorMode?: boolean } | undefined;
+    return context?.operatorMode === true;
   },
 });
 
