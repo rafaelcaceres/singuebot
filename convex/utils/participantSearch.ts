@@ -2,6 +2,20 @@ import { v } from "convex/values";
 import { internalQuery } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { getPhoneVariations, normalizePhoneNumber } from "./phoneNormalizer";
+import schema from "../schema";
+
+/**
+ * Full participant document validator, derived from the schema.
+ *
+ * These used to be hand-written with a subset of the table's fields, so any
+ * participant carrying a field outside that subset (e.g. `importSource` on
+ * CSV-imported participants) failed with ReturnsValidationError.
+ */
+export const participantDocValidator = v.object({
+  _id: v.id("participants"),
+  _creationTime: v.number(),
+  ...schema.tables.participants.validator.fields,
+});
 
 /**
  * Find participant by phone number, considering equivalent variations
@@ -13,23 +27,7 @@ export const findParticipantByPhone = internalQuery({
   args: {
     phone: v.string(),
   },
-  returns: v.union(
-    v.object({
-      _id: v.id("participants"),
-      _creationTime: v.number(),
-      phone: v.string(),
-      name: v.optional(v.string()),
-      consent: v.boolean(),
-      clusterId: v.optional(v.id("clusters")),
-      tags: v.array(v.string()),
-      createdAt: v.number(),
-      threadId: v.optional(v.string()),
-      cargo: v.optional(v.string()),
-      empresa: v.optional(v.string()),
-      setor: v.optional(v.string()),
-    }),
-    v.null()
-  ),
+  returns: v.union(participantDocValidator, v.null()),
   handler: async (ctx, args) => {
     // Get all possible variations of the phone number
     const phoneVariations = getPhoneVariations(args.phone);
@@ -102,20 +100,7 @@ export const findAllParticipantVariations = internalQuery({
   args: {
     phone: v.string(),
   },
-  returns: v.array(v.object({
-    _id: v.id("participants"),
-    _creationTime: v.number(),
-    phone: v.string(),
-    name: v.optional(v.string()),
-    consent: v.boolean(),
-    clusterId: v.optional(v.id("clusters")),
-    tags: v.array(v.string()),
-    createdAt: v.number(),
-    threadId: v.optional(v.string()),
-    cargo: v.optional(v.string()),
-    empresa: v.optional(v.string()),
-    setor: v.optional(v.string()),
-  })),
+  returns: v.array(participantDocValidator),
   handler: async (ctx, args) => {
     const phoneVariations = getPhoneVariations(args.phone);
     const participants = [];
