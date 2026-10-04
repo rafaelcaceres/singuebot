@@ -106,7 +106,9 @@ export const OperatorDashboard: React.FC = () => {
           isLoading={conversations === undefined}
         />
 
-        <div className="flex-1 flex flex-col min-h-0">
+        {/* min-w-0: without it this column refuses to shrink below its content's
+            min-content width and pushes the panel off the right edge. */}
+        <div className="flex-1 flex flex-col min-h-0 min-w-0">
           {selectedParticipantId && conversationDetail ? (
             <ConversationPanel
               conversation={conversationDetail}

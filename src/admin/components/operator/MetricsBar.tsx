@@ -123,7 +123,7 @@ const MetricCard: React.FC<MetricCardProps> = ({
       <div>
         <p className="text-xs text-muted-foreground">{label}</p>
         {isLoading ? (
-          <div className="h-6 w-8 bg-muted rounded animate-pulse" />
+          <div className="h-7 w-8 bg-foreground/10 rounded animate-pulse" />
         ) : (
           <p className={`text-xl font-semibold tabular-nums ${styles.text}`}>{value ?? 0}</p>
         )}

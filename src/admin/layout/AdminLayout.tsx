@@ -78,7 +78,12 @@ export function AdminLayout() {
           <ThemeToggle />
           <SignOutButton />
         </header>
-        <main className={`flex-1 min-h-0 ${isFullBleed ? "overflow-hidden" : "overflow-auto"}`}>
+        {/* `relative` makes <main> the containing block of last resort, so an
+            absolutely positioned descendant (sr-only labels, mostly) can never
+            escape to the document and make the page itself scrollable.
+            Full-bleed routes clip rather than hide: `hidden` is still
+            scrollable from script, `clip` is not. */}
+        <main className={`relative flex-1 min-h-0 ${isFullBleed ? "overflow-clip" : "overflow-auto"}`}>
           {isFullBleed ? (
             <Outlet />
           ) : (

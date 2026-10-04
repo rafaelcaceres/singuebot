@@ -109,8 +109,10 @@ export const ConversationPanel: React.FC<ConversationPanelProps> = ({
         participantId={participantId}
       />
 
-      <div className="flex-1 flex min-h-0">
-        <div className="flex-1 flex flex-col min-h-0">
+      {/* `relative` anchors the details panel, which overlays the thread on
+          narrower screens instead of squeezing it. */}
+      <div className="relative flex-1 flex min-h-0">
+        <div className="flex-1 flex flex-col min-h-0 min-w-0">
           <MessageThread
             messages={conversation.messages}
             conversationKey={participantId}

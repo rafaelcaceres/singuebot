@@ -62,7 +62,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
   messages,
   conversationKey,
 }) => {
-  const endRef = useRef<HTMLDivElement>(null);
+  const scrollerRef = useRef<HTMLDivElement>(null);
   const isInitialLoad = useRef(true);
   const previousKey = useRef(conversationKey);
 
@@ -74,7 +74,12 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
   }, [conversationKey]);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({
+    // Scroll the thread itself, not scrollIntoView(): that also scrolls every
+    // ancestor up to the document, so anything that makes the page taller than
+    // the viewport drags the whole console off-screen.
+    const scroller = scrollerRef.current;
+    scroller?.scrollTo({
+      top: scroller.scrollHeight,
       behavior: isInitialLoad.current ? 'auto' : 'smooth',
     });
     isInitialLoad.current = false;
@@ -95,7 +100,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
     // position:absolute, and without a positioned ancestor they escape this
     // scroll container and land at document coordinates, stretching the page's
     // scrollHeight to the full length of the thread.
-    <div className="relative grow overflow-y-auto p-4 bg-muted/40">
+    <div ref={scrollerRef} className="relative grow overflow-y-auto p-4 bg-muted/40">
       <ol className="max-w-3xl mx-auto space-y-3">
         {messages.map((message) => {
           const outbound = message.direction === 'outbound';
@@ -184,7 +189,6 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
           );
         })}
       </ol>
-      <div ref={endRef} />
     </div>
   );
 };

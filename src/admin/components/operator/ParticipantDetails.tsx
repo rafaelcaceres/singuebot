@@ -94,7 +94,9 @@ export const ParticipantDetails: React.FC<ParticipantDetailsProps> = ({
   };
 
   return (
-    <div className="w-80 border-l border-border bg-card overflow-y-auto">
+    // Below xl there is no room for a third column next to the thread, so the
+    // panel floats over it; from xl up it takes its own column.
+    <div className="absolute inset-y-0 right-0 z-10 w-80 max-w-full shrink-0 border-l border-border bg-card overflow-y-auto shadow-lg xl:relative xl:shadow-none">
       <div className="p-4 border-b border-border bg-muted">
         <h3 className="font-semibold text-foreground">Detalhes do Participante</h3>
       </div>

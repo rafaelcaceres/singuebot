@@ -97,8 +97,11 @@ export const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
         </div>
       </div>
 
-      {/* Conversation List */}
-      <div className="flex-1 overflow-y-auto">
+      {/* Conversation List — `relative` is load-bearing: the sr-only labels in
+          each row are position:absolute, and without a positioned ancestor
+          they escape this scroll container and land at document coordinates,
+          stretching the page's scrollHeight to the full length of the list. */}
+      <div className="relative flex-1 overflow-y-auto">
         {isLoading ? (
           <div className="p-4 space-y-3">
             {[...Array(5)].map((_, i) => (
