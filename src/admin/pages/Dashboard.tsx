@@ -30,13 +30,12 @@ import {
 import { stageLabel } from "@/admin/lib/stages";
 import { StatCluster } from "../components/StatCluster";
 
-type TimeRange = "7d" | "30d" | "90d";
+type TimeRange = "7d" | "30d";
 
-const RANGE_DAYS: Record<TimeRange, number> = { "7d": 7, "30d": 30, "90d": 90 };
+const RANGE_DAYS: Record<TimeRange, number> = { "7d": 7, "30d": 30 };
 const RANGE_LABELS: Record<TimeRange, string> = {
   "7d": "7 dias",
   "30d": "30 dias",
-  "90d": "90 dias",
 };
 
 const HEALTH_LABELS: Record<string, string> = {

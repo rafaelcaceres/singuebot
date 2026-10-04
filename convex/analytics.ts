@@ -11,40 +11,30 @@ export const getRealTimeMetrics = query({
     const now = Date.now();
     const oneDayAgo = now - (24 * 60 * 60 * 1000);
     const oneWeekAgo = now - (7 * 24 * 60 * 60 * 1000);
-    const oneMonthAgo = now - (30 * 24 * 60 * 60 * 1000);
 
     // Get all participants
     const allParticipants = await ctx.db.query("participants").collect();
     const totalParticipants = allParticipants.length;
 
-    // Get all messages
-    const allMessages = await ctx.db.query("whatsappMessages").collect();
-    
+    // Only the last 24h of messages, read through the creation-time index.
+    // Collecting the whole table (twice) is what pushed this query past
+    // Convex's per-execution read limit once broadcasts grew whatsappMessages.
+    // All-time totals are not served from here for the same reason.
+    const recentMessages = await ctx.db
+      .query("whatsappMessages")
+      .withIndex("by_creation_time", q => q.gte("_creationTime", oneDayAgo))
+      .collect();
+
     // Active participants (sent message in last 24h)
-    const recentMessages = allMessages.filter(m => m._creationTime >= oneDayAgo);
     const activeParticipants24h = new Set(
       recentMessages.map(m => m.stateSnapshot?.twilioPayload?.From).filter(Boolean)
     ).size;
 
     // Message volume metrics
     const messagesLast24h = recentMessages.length;
-    const messagesLastWeek = allMessages.filter(m => m._creationTime >= oneWeekAgo).length;
-    const messagesLastMonth = allMessages.filter(m => m._creationTime >= oneMonthAgo).length;
 
-    // Response rate calculation
-    const inboundMessages = allMessages.filter(m => m.direction === "inbound");
-    const outboundMessages = allMessages.filter(m => m.direction === "outbound");
-    const responseRate = inboundMessages.length > 0 
-      ? (outboundMessages.length / inboundMessages.length) * 100 
-      : 0;
-
-    // AI interactions - now from whatsappMessages with aiMetadata
-    const messagesWithAI = await ctx.db
-      .query("whatsappMessages")
-      .filter(q => q.neq(q.field("aiMetadata"), undefined))
-      .collect();
-    
-    const aiInteractions24h = messagesWithAI.filter(msg => 
+    // AI interactions - from whatsappMessages with aiMetadata
+    const aiInteractions24h = recentMessages.filter(msg =>
       msg.aiMetadata && msg.aiMetadata.timestamp >= oneDayAgo
     ).length;
 
@@ -71,14 +61,9 @@ export const getRealTimeMetrics = query({
         consentRate: Math.round(consentRate * 100) / 100,
       },
       messages: {
-        total: allMessages.length,
         last24h: messagesLast24h,
-        lastWeek: messagesLastWeek,
-        lastMonth: messagesLastMonth,
-        responseRate: Math.round(responseRate * 100) / 100,
       },
       ai: {
-        totalInteractions: messagesWithAI.length,
         interactions24h: aiInteractions24h,
         avgResponseTime: 1.2, // Placeholder - would calculate from actual data
       },
@@ -104,13 +89,14 @@ export const getMessageVolumeChart = query({
   },
   handler: async (ctx, args) => {
     await requireOrganizer(ctx, "viewer");
-    const days = args.days || 7;
+    // Capped at 30 days: every message in the window is read in one execution.
+    const days = Math.min(args.days || 7, 30);
     const now = Date.now();
     const startTime = now - (days * 24 * 60 * 60 * 1000);
 
     const messages = await ctx.db
       .query("whatsappMessages")
-      .filter(q => q.gte(q.field("_creationTime"), startTime))
+      .withIndex("by_creation_time", q => q.gte("_creationTime", startTime))
       .collect();
 
     // Group messages by day
@@ -245,14 +231,12 @@ export const getSystemHealth = query({
     // Recent activity indicators
     const recentMessages = await ctx.db
       .query("whatsappMessages")
-      .filter(q => q.gte(q.field("_creationTime"), oneHourAgo))
+      .withIndex("by_creation_time", q => q.gte("_creationTime", oneHourAgo))
       .collect();
 
-    const recentAIInteractions = await ctx.db
-      .query("whatsappMessages")
-      .filter(q => q.gte(q.field("_creationTime"), oneHourAgo))
-      .filter(q => q.neq(q.field("aiMetadata"), undefined))
-      .collect();
+    const recentAIInteractions = recentMessages.filter(
+      m => m.aiMetadata !== undefined
+    );
 
     // Processing jobs status
     const processingJobs = await ctx.db
@@ -378,15 +362,16 @@ export const getRecentActivity = query({
     // Get recent messages
     const recentMessages = await ctx.db
       .query("whatsappMessages")
-      .filter(q => q.gte(q.field("_creationTime"), oneDayAgo))
+      .withIndex("by_creation_time", q => q.gte("_creationTime", oneDayAgo))
       .order("desc")
       .take(limit);
 
     // Get recent AI interactions from whatsappMessages with aiMetadata
     const recentAI = await ctx.db
       .query("whatsappMessages")
-      .filter(q => q.neq(q.field("aiMetadata"), undefined))
+      .withIndex("by_creation_time", q => q.gte("_creationTime", oneDayAgo))
       .order("desc")
+      .filter(q => q.neq(q.field("aiMetadata"), undefined))
       .take(limit * 2); // Get more to filter by timestamp
 
     const filteredAI = recentAI
@@ -396,7 +381,7 @@ export const getRecentActivity = query({
     // Get recent participants
     const recentParticipants = await ctx.db
       .query("participants")
-      .filter(q => q.gte(q.field("_creationTime"), oneDayAgo))
+      .withIndex("by_creation_time", q => q.gte("_creationTime", oneDayAgo))
       .order("desc")
       .take(limit);
 

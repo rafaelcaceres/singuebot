@@ -64,7 +64,7 @@ export const getOperatorMetrics = query({
     // Count today's messages
     const todayMessages = await ctx.db
       .query("whatsappMessages")
-      .filter((q) => q.gte(q.field("_creationTime"), todayStartMs))
+      .withIndex("by_creation_time", (q) => q.gte("_creationTime", todayStartMs))
       .collect();
 
     return {
