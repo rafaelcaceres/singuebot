@@ -80,6 +80,7 @@ export const runBroadcastBatch = internalAction({
 
           await ctx.runMutation(internal.functions.broadcasts.logBroadcastMessage, {
             participantId: item.participantId,
+            recipientId: item.recipientId,
             messageId: response.sid,
             phone: item.phone,
             templateName: claim.templateName,

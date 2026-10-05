@@ -133,6 +133,15 @@ function allowlist(): Set<string> | null {
   );
 }
 
+/** Which broadcast counter a recipient status is tallied under, if any. */
+function tallyOf(
+  status: Doc<"broadcastRecipients">["status"],
+): "sent" | "failed" | null {
+  if (status === "sent" || status === "delivered" || status === "read") return "sent";
+  if (status === "failed") return "failed";
+  return null;
+}
+
 async function patchCounters(
   ctx: MutationCtx,
   broadcastId: Id<"broadcasts">,
@@ -612,10 +621,14 @@ export const claimNextBatch = internalMutation({
 
       // Flipping to "sending" inside this transaction is what makes the claim
       // exclusive: two chains physically cannot take the same recipient.
+      // Dropping the previous attempt's SID means a `sending` recipient can only be
+      // matched by callbacks for the send in flight, never by a late one for a retry's
+      // predecessor.
       await ctx.db.patch(recipient._id, {
         status: "sending",
         claimedAt: now,
         attempts: recipient.attempts + 1,
+        messageSid: undefined,
       });
 
       items.push({
@@ -665,7 +678,12 @@ export const recordBatchResults = internalMutation({
 
     for (const result of args.results) {
       const recipient = await ctx.db.get(result.recipientId);
-      if (!recipient) continue;
+      // Only a recipient still held by this claim is ours to settle. The status
+      // webhook finds it by SID as soon as the message is logged and routinely gets
+      // here first (a 63018 comes back ~9s after the POST, a batch can take 20s+);
+      // it has then already counted the recipient, and settling it again would
+      // bury the real outcome under "sent".
+      if (!recipient || recipient.status !== "sending") continue;
 
       if (result.outcome === "sent") {
         await ctx.db.patch(result.recipientId, {
@@ -746,6 +764,7 @@ export const finalizeBroadcast = internalMutation({
 export const logBroadcastMessage = internalMutation({
   args: {
     participantId: v.id("participants"),
+    recipientId: v.optional(v.id("broadcastRecipients")),
     messageId: v.string(),
     phone: v.string(),
     templateName: v.string(),
@@ -753,6 +772,19 @@ export const logBroadcastMessage = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    // Attach the SID the moment Twilio hands it back, not when the batch closes:
+    // status callbacks look the recipient up by SID, and waiting for
+    // recordBatchResults dropped every callback that arrived mid-batch.
+    if (args.recipientId) {
+      const recipient = await ctx.db.get(args.recipientId);
+      if (recipient) {
+        await ctx.db.patch(args.recipientId, {
+          messageSid: args.messageId,
+          sentAt: Date.now(),
+        });
+      }
+    }
+
     let conversation = await ctx.db
       .query("conversations")
       .withIndex("by_participant", (q) => q.eq("participantId", args.participantId))
@@ -1142,26 +1174,43 @@ export const updateRecipientByMessageSid = internalMutation({
 
     if (!mapped) return null;
     if (recipient.status === mapped) return null;
+    // A requeued or skipped recipient still carries the SID of an attempt that is over.
+    if (recipient.status === "pending" || recipient.status === "skipped") return null;
+    // Callbacks are not ordered: a late "delivered" must not undo a "read".
+    if (recipient.status === "read" && mapped === "delivered") return null;
 
-    // A delivery failure arrives after we already counted the send as successful.
-    if (mapped === "failed" && recipient.status !== "failed") {
+    // The counters follow the recipient. A `sending` one is not tallied yet: the
+    // callback beat recordBatchResults, which will now leave it alone.
+    const from = tallyOf(recipient.status);
+    const to = tallyOf(mapped);
+    if (from !== to) {
       const broadcast = await ctx.db.get(recipient.broadcastId);
       if (broadcast) {
+        const delta = (tally: "sent" | "failed") =>
+          (to === tally ? 1 : 0) - (from === tally ? 1 : 0);
         await ctx.db.patch(recipient.broadcastId, {
-          sentCount: Math.max(0, broadcast.sentCount - 1),
-          failedCount: broadcast.failedCount + 1,
+          sentCount: Math.max(0, broadcast.sentCount + delta("sent")),
+          failedCount: Math.max(0, broadcast.failedCount + delta("failed")),
         });
       }
     }
 
-    await ctx.db.patch(recipient._id, {
-      status: mapped,
-      errorCode: args.errorCode ?? recipient.errorCode,
-      errorMessage:
-        mapped === "failed"
-          ? (recipient.errorMessage ?? "Falha na entrega")
-          : recipient.errorMessage,
-    });
+    await ctx.db.patch(
+      recipient._id,
+      mapped === "failed"
+        ? {
+            status: mapped,
+            claimedAt: undefined,
+            errorCode: args.errorCode ?? recipient.errorCode,
+            errorMessage: recipient.errorMessage ?? "Falha na entrega",
+          }
+        : {
+            status: mapped,
+            claimedAt: undefined,
+            errorCode: undefined,
+            errorMessage: undefined,
+          },
+    );
     return null;
   },
 });
