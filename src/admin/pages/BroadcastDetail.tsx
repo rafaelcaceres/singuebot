@@ -6,7 +6,7 @@ import { api } from '../../../convex/_generated/api';
 import { Id } from '../../../convex/_generated/dataModel';
 import { StatusPill } from './Broadcasts';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
+import { BroadcastProgressBar } from '../components/BroadcastProgressBar';
 import { StatusBadge } from '@/components/ui/status-badge';
 
 const SKIP_LABELS: Record<string, string> = {
@@ -114,11 +114,18 @@ export const BroadcastDetail: React.FC = () => {
       <div className="mt-8 rounded-lg border border-border bg-card p-6 shadow-sm">
         <div className="flex items-baseline justify-between">
           <span className="text-sm font-medium text-foreground">
-            {done} de {broadcast.total}
+            {done} de {broadcast.total} processados
           </span>
           <span className="text-sm text-muted-foreground">{percent}%</span>
         </div>
-        <Progress value={percent} className="mt-2" aria-label="Progresso do disparo" />
+        <BroadcastProgressBar
+          sent={broadcast.sentCount}
+          failed={broadcast.failedCount}
+          skipped={broadcast.skippedCount}
+          total={broadcast.total}
+          className="mt-2"
+          aria-label="Progresso do disparo"
+        />
 
         <dl className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
           <div>

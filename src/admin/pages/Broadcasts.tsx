@@ -5,7 +5,7 @@ import { Megaphone, FlaskConical } from 'lucide-react';
 import { api } from '../../../convex/_generated/api';
 import { StatusBadge, type StatusTone } from '@/components/ui/status-badge';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
+import { BroadcastProgressBar } from '../components/BroadcastProgressBar';
 
 const STATUS_TONES: Record<string, StatusTone> = {
   draft: 'neutral',
@@ -83,7 +83,6 @@ export const Broadcasts: React.FC = () => {
             <tbody className="divide-y divide-border bg-card">
               {broadcasts.map((broadcast) => {
                 const done = broadcast.sentCount + broadcast.failedCount + broadcast.skippedCount;
-                const percent = broadcast.total > 0 ? Math.round((done / broadcast.total) * 100) : 0;
                 return (
                   <tr key={broadcast._id} className="hover:bg-muted">
                     <td className="px-6 py-4">
@@ -109,8 +108,11 @@ export const Broadcasts: React.FC = () => {
                       <div className="text-sm text-foreground">
                         {done} / {broadcast.total}
                       </div>
-                      <Progress
-                        value={percent}
+                      <BroadcastProgressBar
+                        sent={broadcast.sentCount}
+                        failed={broadcast.failedCount}
+                        skipped={broadcast.skippedCount}
+                        total={broadcast.total}
                         className="mt-1 h-1.5 w-32"
                         aria-label={`Progresso do disparo ${broadcast.label}`}
                       />
